@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { errorHandler } = require('./middlewares/error.middleware');
+const { createCorsOptions } = require('./config/cors');
+const { createDatabaseMiddleware } = require('./middlewares/database.middleware');
 
 const app = express();
 app.use((req, res, next) => {
@@ -10,19 +12,17 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-app.use(cors({
-  origin: ['http://localhost:8081', 'http://localhost:8082', 'http://localhost:19006', 'http://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(cors(createCorsOptions()));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true, parameterLimit: 100000 }));
 
 // Static folder for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes (to be added)
+// Vercel can import this Express app without running server.js. Initialize the
+// shared database connection before API handlers, while leaving CORS preflight
+// requests and static assets independent of database availability.
+app.use('/api', createDatabaseMiddleware());
 app.use('/api', require('./routes'));
 
 // Error Handler

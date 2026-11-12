@@ -12,9 +12,11 @@ connectDB().then(async () => {
     await require('./domains/orders/order.model').syncIndexes();
     await require('./domains/payments/payment.model').syncIndexes();
     console.log('Database indexes synchronized.');
-  } catch (err) {
-    console.error('Index sync error:', err);
+  } catch {
+    console.error('Database index synchronization failed.');
   }
+}).catch(() => {
+  console.error('Database connection is unavailable. API requests will retry the connection.');
 });
 
 const PORT = process.env.PORT || 5000;
@@ -24,8 +26,8 @@ const server = app.listen(PORT, () => {
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-  console.log(`Error: ${err.message}`);
+process.on('unhandledRejection', () => {
+  console.error('An unhandled server error occurred.');
   // Close server & exit process
   server.close(() => process.exit(1));
 });

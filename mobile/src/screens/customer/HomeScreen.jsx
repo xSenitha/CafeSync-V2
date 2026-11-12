@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView,
   ActivityIndicator, Platform, useWindowDimensions, RefreshControl,
-  Image, Modal, TextInput, Alert,
+  Image, Modal, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
@@ -10,6 +10,7 @@ import { useCart } from '../../context/CartContext';
 import { COLORS } from '../../constants/colors';
 import { ordersAPI, reservationsAPI, menuAPI, paymentsAPI, cardsAPI } from '../../api';
 import apiClient from '../../api/client';
+import { Alert } from '../../utils/alert';
 
 const ORDER_TYPES = [
   { key: 'Dine-In', icon: 'restaurant-outline', label: 'Dine-In', desc: 'Eat at the cafe' },

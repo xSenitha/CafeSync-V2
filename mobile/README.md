@@ -54,11 +54,13 @@ The application screens and navigation live in `src/`; Expo Router provides the 
 
 ## Development checks
 
+For Vercel, set the project Root Directory to `mobile` and supply the HTTPS `EXPO_PUBLIC_API_URL` before the build. The checked-in `vercel.json` configures installation, URL validation, static export, and output directory. Follow the [Vercel deployment steps](../README.md#deploy-the-frontend-to-vercel), including backend CORS configuration.
+
 Run from this directory:
 
 ```bash
 npx tsc --noEmit
-npx expo export --platform web --output-dir dist
+npm run build
 ```
 
 The first command checks the project's TypeScript files. The second builds the web bundle into `dist/`. Use `npm run lint` for the configured Expo ESLint checks.

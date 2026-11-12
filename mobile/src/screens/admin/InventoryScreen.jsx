@@ -6,11 +6,25 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { adminInventoryAPI } from '../../api';
+import apiClient from '../../api/client';
 import { COLORS } from '../../constants/colors';
 
 const CATEGORIES = ['Coffee', 'Tea', 'Snacks', 'Desserts', 'Beverages', 'Other'];
 const CAT_ICONS = { Coffee: 'cafe', Tea: 'leaf', Snacks: 'fast-food', Desserts: 'ice-cream', Beverages: 'wine', Other: 'restaurant' };
 const EMPTY_FORM = { name: '', description: '', price: '', stock: '', category: 'Coffee', image: '' };
+
+const InventoryImage = ({ item }) => {
+  const [failed, setFailed] = useState(false);
+  const image = item.image;
+  const uri = image && image !== 'no-photo.jpg'
+    ? (/^https?:\/\//i.test(image) ? image : `${apiClient.defaults.baseURL.replace(/\/api\/?$/, '')}/uploads/${image}`)
+    : null;
+  useEffect(() => { setFailed(false); }, [image]);
+
+  return uri && !failed
+    ? <Image source={{ uri }} style={styles.itemImg} onError={() => setFailed(true)} accessibilityLabel={item.name} />
+    : <Ionicons name={CAT_ICONS[item.category] || 'restaurant'} size={24} color={COLORS.primary} />;
+};
 
 const InventoryScreen = () => {
   const [items, setItems] = useState([]);
@@ -93,11 +107,7 @@ const InventoryScreen = () => {
   const renderItem = ({ item }) => (
     <View style={styles.itemCard}>
       <View style={[styles.itemIconBg, { backgroundColor: COLORS.primaryGlow }]}>
-        {item.image ? (
-          <Image source={{ uri: item.image }} style={styles.itemImg} />
-        ) : (
-          <Ionicons name={CAT_ICONS[item.category] || 'restaurant'} size={24} color={COLORS.primary} />
-        )}
+        <InventoryImage item={item} />
       </View>
       <View style={styles.itemInfo}>
         <View style={styles.itemTitleRow}>
@@ -157,7 +167,7 @@ const InventoryScreen = () => {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="restaurant-outline" size={60} color={COLORS.divider} />
-              <Text style={styles.emptyText}>No items yet. Tap "Add Item"</Text>
+              <Text style={styles.emptyText}>No items yet. Tap &quot;Add Item&quot;</Text>
             </View>
           }
         />

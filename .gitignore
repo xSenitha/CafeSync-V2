@@ -95,3 +95,8 @@ mobile/coverage/
 # Others
 backend/tmp/
 mobile/tmp/
+
+# Commit safe setup templates and the frontend deployment dependency lock.
+!backend/.env.example
+!mobile/.env.example
+!mobile/package-lock.json

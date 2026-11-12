@@ -2,13 +2,14 @@ import React, { useContext, useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, Platform, Animated, Modal, TextInput,
-  ActivityIndicator, Alert, Image,
+  ActivityIndicator, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../constants/colors';
 import { ordersAPI, reservationsAPI } from '../../api';
+import { Alert } from '../../utils/alert';
 
 const InfoRow = ({ icon, label, value }) => (
   <View style={styles.infoRow}>

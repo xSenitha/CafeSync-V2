@@ -2,11 +2,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, Platform, RefreshControl,
-  ScrollView, Animated, Dimensions, Alert
+  ScrollView, Animated, Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { adminOrdersAPI } from '../../api';
 import { COLORS } from '../../constants/colors';
+import { Alert } from '../../utils/alert';
 
 const { width } = Dimensions.get('window');
 

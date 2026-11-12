@@ -100,6 +100,35 @@ The app accepts an optional `EXPO_PUBLIC_API_URL` in `mobile/.env`. Include `/ap
 
 Without an override, web uses localhost. Native apps use the detected Expo host when available, otherwise the Android emulator address. An explicit URL overrides this detection. Restart Expo after changing the mobile environment configuration.
 
+## Deploy the frontend to Vercel
+
+Use a separate Vercel project for the frontend so the existing backend deployment keeps its own domain. Import this Git repository and configure:
+
+| Vercel setting | Value |
+| --- | --- |
+| Root Directory | `mobile` |
+| Framework Preset | Other |
+| Install Command | `npm ci` |
+| Build Command | Read from `mobile/vercel.json` |
+| Output Directory | `dist` |
+| Environment variable | `EXPO_PUBLIC_API_URL=https://cafe-sync-v2.vercel.app/api` |
+
+Set the API URL for both Production and any Preview environments you use, then deploy. Vercel runs the deployment URL check and `npm run build`, which clears Expo's transform cache so changed environment values are included in the exported bundle. Expo exports static HTML for its existing routes, and `cleanUrls` serves those routes without `.html`. See [Expo's publishing guide](https://docs.expo.dev/guides/publishing-websites/) and [Vercel build settings](https://vercel.com/docs/builds/configure-a-build).
+
+`EXPO_PUBLIC_API_URL` is embedded in the web bundle at build time. Change it to your own public HTTPS backend `/api` address if your backend domain changes, and redeploy after editing it. The deployment check rejects a missing URL, HTTP, localhost, or a URL without the `/api` suffix. AI keys and database credentials stay in the backend project's environment settings.
+
+In the backend Vercel project, configure the exact frontend origin after the frontend domain is assigned:
+
+```dotenv
+CORS_ORIGINS=https://YOUR_FRONTEND_PROJECT.vercel.app
+```
+
+Use comma-separated exact origins for additional custom or preview domains. Local development origins remain allowed. Redeploy the backend after changing its Vercel environment settings. Set `MONGODB_URI`, `JWT_SECRET`, and your selected AI provider settings on that backend project too. API requests must have a working MongoDB connection; the app initializes and reuses it even when Vercel imports `src/app.js` directly.
+
+Before checking the deployed UI, confirm `https://cafe-sync-v2.vercel.app/api/inventory` returns HTTP 200 and a JSON inventory list. A backend HTTP 500/503 must be resolved before menu loading, authentication, orders, and AI chat can work. Then check sign-in, menu images, cart, reservations, and the companion from the frontend domain. Server uploads on Vercel need persistent external storage; local runtime files are not durable deployment storage.
+
+Commit `mobile/vercel.json`, the build script, `mobile/package-lock.json`, and the `.env.example` templates. Real `.env` files and generated `dist`/`node_modules` remain ignored. Both application folders are tracked as normal source directories in the main repository.
+
 ## AI assistant
 
 Open the **Cafe companion** card on the customer menu. You can ask questions such as:

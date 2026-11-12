@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
-  TouchableOpacity, ActivityIndicator, Platform, RefreshControl, Alert,
+  TouchableOpacity, ActivityIndicator, Platform, RefreshControl,
   Modal, TextInput, ScrollView, Animated, Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cardsAPI } from '../../api';
 import { COLORS } from '../../constants/colors';
+import { Alert } from '../../utils/alert';
 
 const { width } = Dimensions.get('window');
 
