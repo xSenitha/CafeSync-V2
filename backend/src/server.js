@@ -1,6 +1,6 @@
-require('./config/env').loadEnv();
 const app = require('./app');
 const connectDB = require('./config/db');
+const { logDatabaseFailure } = require('./config/database-diagnostics');
 const dns = require('dns');
 
 dns.setServers(['8.8.8.8', '1.1.1.1']);
@@ -15,7 +15,8 @@ connectDB().then(async () => {
   } catch {
     console.error('Database index synchronization failed.');
   }
-}).catch(() => {
+}).catch((error) => {
+  logDatabaseFailure(console.error, error);
   console.error('Database connection is unavailable. API requests will retry the connection.');
 });
 

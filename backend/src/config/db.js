@@ -1,8 +1,10 @@
 const mongoose = require('mongoose');
+const { classifyDatabaseFailure } = require('./database-diagnostics');
 
-function databaseError(code, message) {
+function databaseError(code, message, diagnostic) {
   const error = new Error(message);
   error.code = code;
+  error.diagnostic = diagnostic;
   return error;
 }
 
@@ -15,7 +17,7 @@ function createDBConnector({ mongoose: database = mongoose, env = process.env } 
 
     const uri = env.MONGODB_URI;
     if (typeof uri !== 'string' || !uri.trim()) {
-      return Promise.reject(databaseError('DATABASE_NOT_CONFIGURED', 'Database is not configured.'));
+      return Promise.reject(databaseError('DATABASE_NOT_CONFIGURED', 'Database is not configured.', 'database_not_configured'));
     }
 
     // One connection attempt per warm API instance, shared by simultaneous
@@ -23,7 +25,9 @@ function createDBConnector({ mongoose: database = mongoose, env = process.env } 
     const pending = Promise.resolve()
       .then(() => database.connect(uri.trim(), { serverSelectionTimeoutMS: 5000 }))
       .then(() => database.connection)
-      .catch(() => { throw databaseError('DATABASE_UNAVAILABLE', 'Database connection is unavailable.'); })
+      .catch((error) => {
+        throw databaseError('DATABASE_UNAVAILABLE', 'Database connection is unavailable.', classifyDatabaseFailure(error));
+      })
       .finally(() => { if (inFlight === pending) inFlight = null; });
     inFlight = pending;
     return pending;

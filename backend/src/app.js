@@ -1,3 +1,4 @@
+require('./config/env').loadEnv();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -22,7 +23,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Vercel can import this Express app without running server.js. Initialize the
 // shared database connection before API handlers, while leaving CORS preflight
 // requests and static assets independent of database availability.
+app.use('/api/health', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 app.use('/api', createDatabaseMiddleware());
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ success: true, status: 'ok', database: 'connected' });
+});
 app.use('/api', require('./routes'));
 
 // Error Handler

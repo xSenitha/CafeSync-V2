@@ -127,6 +127,23 @@ Use comma-separated exact origins for additional custom or preview domains. Loca
 
 Before checking the deployed UI, confirm `https://cafe-sync-v2.vercel.app/api/inventory` returns HTTP 200 and a JSON inventory list. A backend HTTP 500/503 must be resolved before menu loading, authentication, orders, and AI chat can work. Then check sign-in, menu images, cart, reservations, and the companion from the frontend domain. Server uploads on Vercel need persistent external storage; local runtime files are not durable deployment storage.
 
+`GET /api/health` checks database readiness. It returns HTTP 200 with `{ "success": true, "status": "ok", "database": "connected" }` once the shared MongoDB connection is available, or the same generic HTTP 503 as other API routes when the connection fails. Health responses are not cached.
+
+If the URI and Atlas IP access list are correct but requests still return 503, open the backend project's Vercel Runtime Logs and request `/api/health`. Look for `[CafeSync database]` and its safe `code`:
+
+| Code | What to check |
+| --- | --- |
+| `database_not_configured` | `MONGODB_URI` is missing in the running deployment; check the backend project and Production/Preview scope, then redeploy |
+| `database_invalid_configuration` | Connection string syntax, unencoded password characters, or invalid driver options |
+| `database_authentication_failed` | Database user credentials and authentication database |
+| `database_dns_error` | Cluster hostname, SRV DNS resolution, and whether the cluster exists and is active |
+| `database_tls_error` | TLS handshake or certificate failure; verify runtime/network compatibility without disabling certificate verification |
+| `database_network_error` | Connection refused/reset or unreachable host; verify cluster availability, outbound access and the matching Atlas project's IP access list |
+| `database_timeout` | No suitable database server was reachable within the five-second selection timeout; check cluster availability and network access |
+| `database_unavailable` | An unclassified connection failure; investigate deployment and cluster availability |
+
+These logs contain fixed diagnostic codes, not connection strings, credentials or raw driver errors. Local startup success does not verify the deployed environment or its network path.
+
 Commit `mobile/vercel.json`, the build script, `mobile/package-lock.json`, and the `.env.example` templates. Real `.env` files and generated `dist`/`node_modules` remain ignored. Both application folders are tracked as normal source directories in the main repository.
 
 ## AI assistant
