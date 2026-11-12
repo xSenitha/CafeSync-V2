@@ -1,0 +1,97 @@
+# Node.js backend
+backend/node_modules/
+backend/.env
+backend/.env.*
+backend/logs/
+backend/coverage/
+backend/dist/
+backend/uploads/
+backend/debug.log
+backend/npm-debug.log
+backend/yarn-debug.log
+backend/yarn-error.log
+backend/.DS_Store
+
+# Mobile (React Native/Expo)
+mobile/node_modules/
+mobile/.expo/
+mobile/.expo-shared/
+mobile/.env
+mobile/.env.*
+mobile/coverage/
+mobile/dist/
+mobile/web-build/
+mobile/.DS_Store
+mobile/.vscode/
+mobile/.idea/
+mobile/.expo-go/
+mobile/.expo-packager/
+mobile/.expo-settings/
+mobile/.expo-source-maps/
+mobile/.expo-cache/
+mobile/.expo-debug/
+mobile/.expo-test/
+mobile/.expo-updates/
+mobile/.expo-web/
+mobile/.expo-bundle/
+mobile/.expo-modules/
+mobile/.expo-logs/
+mobile/.expo-assets/
+mobile/.expo-app/
+mobile/.expo-android/
+mobile/.expo-ios/
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+
+# VSCode
+.vscode/
+
+# OS generated files
+Icon?
+
+# Misc
+*.bak
+*.orig
+*.rej
+*.sublime-workspace
+*.sublime-project
+
+# Test output
+backend/test-results/
+mobile/test-results/
+
+# Expo
+mobile/.expo/
+mobile/.expo-shared/
+
+# Yarn
+**/yarn.lock
+
+# npm
+**/package-lock.json
+
+# Build artifacts
+backend/build/
+mobile/build/
+
+# Coverage reports
+backend/coverage/
+mobile/coverage/
+
+# IDE files
+.idea/
+*.iml
+
+# Environment variables
+.env
+.env.*
+
+# Others
+backend/tmp/
+mobile/tmp/
