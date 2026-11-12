@@ -1,22 +1,82 @@
 # CafeSync
 
-An Expo / React Native cafe app with an Express and MongoDB API. Customers can browse the menu, build a cart, track orders, reserve tables, and manage their profile. Admin screens manage inventory, orders, tables, and payments.
+CafeSync is a cafe management app built with Expo / React Native, Express, and MongoDB. It brings menu browsing, orders, table reservations, payment records, and an AI cafe companion into one customer experience, with a separate admin area for daily operations.
 
-The customer experience uses a warm cream and forest palette, responsive menu cards, search and category filters, stock-aware cart controls, and a cafe companion.
+## Features
 
-## Run locally
+| Area | Included features |
+| --- | --- |
+| Customer experience | Warm cafe styling, responsive menu cards, search, category filters, and stock-aware cart controls |
+| Orders | Dine-in, takeaway, and delivery checkout; active orders and order history |
+| Reservations | Table availability, bookings, and reservation management |
+| Account | Registration, sign-in, profile settings, saved cards, and payment history |
+| Admin | Dashboard, inventory, order management, tables, and payment records |
+| Cafe companion | Gemini or OpenAI recommendations, budget suggestions, customer order status, and reservation guidance |
 
-Use Node.js 22 or newer and a MongoDB database. Install each app's dependencies separately.
+Payment flows currently record application payment statuses. The backend does not integrate a payment gateway to charge cards.
+
+## Project structure
+
+```text
+backend/
+  src/
+    config/             # MongoDB, environment loading, and AI provider selection
+    domains/            # Auth, inventory, orders, reservations, payments, cards, assistant
+    middlewares/        # Authentication and error handling
+    routes/             # API route registration
+    app.js              # Express app
+    server.js           # API entry point
+  scripts/check-ai.js   # Provider connection diagnostic
+  test/                 # Assistant and Gemini tests
+  .env.example
+mobile/
+  app/_layout.tsx       # Expo entry layout and application providers
+  src/
+    api/                # API client and endpoint adapters
+    components/         # Shared UI components
+    constants/          # Colors, spacing, and typography
+    context/            # Authentication and cart state
+    navigation/         # Auth, customer, and admin navigation
+    screens/            # Auth, customer, and admin screens
+  assets/
+  .env.example
+```
+
+The mobile app uses Expo Router as its entry point and React Navigation for the app's auth, customer, and admin flows. See the [mobile README](mobile/README.md) for mobile development details.
+
+## Local setup
+
+You need Node.js 22 or newer, npm, and a reachable MongoDB database. Run the following commands from the project root in separate terminals.
+
+### 1. Start the backend
 
 ```powershell
 cd backend
 npm install
-Copy-Item .env.example .env  # Only if you do not already have a .env file
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Set `MONGODB_URI` and a strong `JWT_SECRET` in `backend/.env`, then run `npm run dev`. The API defaults to port 5000.
+Edit `backend/.env` with your database connection and JWT settings:
 
-In a second terminal:
+```dotenv
+PORT=5000
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=replace_with_a_long_random_secret
+JWT_EXPIRE=30d
+NODE_ENV=development
+```
+
+Then start the API:
+
+```powershell
+npm run dev
+```
+
+The default API base URL is `http://localhost:5000/api`. `npm start` runs the server without the development watcher.
+
+### 2. Start the app
+
+In a second terminal from the project root:
 
 ```powershell
 cd mobile
@@ -24,13 +84,35 @@ npm install
 npm run web
 ```
 
-For Android or iOS, run `npm start` and open the app in Expo Go. `mobile/.env.example` documents the optional `EXPO_PUBLIC_API_URL`. The app otherwise detects the Expo host for physical devices, uses localhost on web, and defaults to `10.0.2.2` for an Android emulator. When setting the URL on a phone, use the API computer's LAN address, with `/api` at the end.
+Open the local URL printed by Expo. To use Expo Go or a configured emulator instead, run `npm start` and choose the target from Expo's terminal menu.
 
-## Cafe companion
+Register a customer account to explore the app. Accounts with the `admin` role open the admin area. The menu comes from MongoDB inventory; add inventory through the admin area if your database has no menu items.
 
-Sign in as a customer and tap the companion card on the menu. It can recommend available items within a budget, show your latest order status, and help you reach the reservation screen. Recommendations can be added to the cart with an explicit tap; customers review and confirm orders and bookings in the existing flows.
+### API connection on different devices
 
-To enable Gemini replies, add these **server-only** settings to `backend/.env` and restart the API:
+The app accepts an optional `EXPO_PUBLIC_API_URL` in `mobile/.env`. Include `/api` at the end.
+
+| Target | Example URL |
+| --- | --- |
+| Web on the API computer | `http://localhost:5000/api` |
+| Android emulator | `http://10.0.2.2:5000/api` |
+| Physical phone on the same network | `http://YOUR_COMPUTER_LAN_IP:5000/api` |
+
+Without an override, web uses localhost. Native apps use the detected Expo host when available, otherwise the Android emulator address. An explicit URL overrides this detection. Restart Expo after changing the mobile environment configuration.
+
+## AI assistant
+
+Open the **Cafe companion** card on the customer menu. You can ask questions such as:
+
+- "Recommend a coffee under Rs. 1,000."
+- "What is the status of my latest order?"
+- "How can I reserve a table?"
+
+Recommendations use active, in-stock inventory. Tap **Add** to put an item in your cart, then review and confirm checkout. The assistant guides users to orders and reservations; it does not place orders, make payments, or create bookings itself. Dietary and allergen suitability must be confirmed with the cafe team.
+
+### Gemini configuration
+
+Create a key in [Google AI Studio](https://aistudio.google.com/apikey), then set these values in **`backend/.env`**:
 
 ```dotenv
 AI_PROVIDER=gemini
@@ -38,57 +120,106 @@ GEMINI_API_KEY=your_google_ai_studio_key
 GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
-Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/apikey). The default Gemini model supports structured output; see [Google's model documentation](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite). Your project's model access and quota still apply.
+Restart the backend after configuring the provider. The model is configurable; its availability and quota depend on your Google project. See the [Gemini key setup guide](https://ai.google.dev/gemini-api/docs/api-key).
 
-To use OpenAI instead:
+### OpenAI configuration
+
+To select OpenAI, use:
 
 ```dotenv
 AI_PROVIDER=openai
-OPENAI_API_KEY=your_api_key
+OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4.1-mini
 ```
 
-The model is configurable for each provider. Set `AI_PROVIDER` explicitly when both keys are present. Without `AI_PROVIDER`, existing OpenAI setups keep working; a Gemini-only key selects Gemini automatically. The app never forwards a key to a different provider or automatically switches providers after a failure. Without the selected key, or if that provider times out or fails, the companion returns a clearly labelled **Menu guide** response with an AI availability notice. It never claims verified dietary or allergen suitability.
+Restart the backend after changing these settings. See the [official OpenAI Responses documentation](https://developers.openai.com/api/reference/resources/responses/methods/create).
 
-### Troubleshoot AI replies
+Set `AI_PROVIDER` explicitly when both keys are configured. If it is omitted, a Gemini-only key selects Gemini; otherwise the app selects OpenAI. The example environment file sets `AI_PROVIDER=openai`, so change that value when choosing Gemini. Provider failures return the menu guide rather than switching to another provider.
 
-From `backend`, run `npm run check:ai` to test the selected provider's key and model without accessing customer records or MongoDB. This makes one small request to Gemini or OpenAI; it prints a safe result and never prints the key. The backend also records a short, sanitized failure code when it switches to the guide. Gemini requests use Google's native `generateContent` endpoint; see the [Gemini API documentation](https://ai.google.dev/api/generate-content) and [key setup guide](https://ai.google.dev/gemini-api/docs/api-key).
+AI keys belong on the backend. Never put them in `mobile/.env` or an `EXPO_PUBLIC_` variable. The backend resolves its `.env` relative to its own directory. Existing shell or deployment environment variables take precedence over that file. The development watcher reloads backend `.env` changes; a server started with `npm start` needs a manual restart.
 
-For OpenAI, `credit_balance_exhausted` means the account has no API credits remaining. Add API credits to the account/project used by the key, then retry. The normalized `quota_exceeded` diagnostic can also indicate billing, spend, or quota limits needing attention; repeatedly retrying will not restore exhausted credits. See the [official OpenAI error-code guide](https://developers.openai.com/api/docs/guides/error-codes). For Gemini authentication, permissions, quota, or billing problems, use the [Google troubleshooting guide](https://ai.google.dev/gemini-api/docs/troubleshooting).
+### Check the provider connection
 
-Keep the key in `backend/.env`. The backend resolves this file relative to its own directory, so starting from the project root also works. The development watcher reloads `.env` changes; an API started with `npm start` needs a restart. Existing shell/deployment environment variables intentionally take precedence over `.env`.
+From `backend`, run:
 
-`POST /api/assistant/chat` requires the existing bearer token. Example request:
+```powershell
+npm run check:ai
+```
+
+This sends one small request to the selected provider without connecting to MongoDB or sending customer records. It prints a sanitized result and never prints the key. The request uses the provider's quota and may incur a small API charge.
+
+| Result | What to check |
+| --- | --- |
+| `available` | The selected provider accepted the diagnostic request |
+| `not_configured` | Add the selected provider's API key to `backend/.env` |
+| `invalid_configuration` | Set `AI_PROVIDER` to `gemini` or `openai` |
+| `authentication_failed` | Verify the key belongs to the selected provider and is active |
+| `permission_denied` / `model_unavailable` | Check project permissions and access to the configured model |
+| `quota_exceeded` | Check the provider project's credits, billing, and quota limits |
+| `rate_limited` | Wait before retrying and check request limits |
+| `timeout` / `network_error` | Check the backend computer's network, proxy, or firewall |
+| `invalid_response` / `provider_unavailable` | Check provider availability and structured-output compatibility |
+
+For OpenAI, `credit_balance_exhausted` means API credits have run out. Adding another key for the same exhausted account will not restore credits. See [OpenAI error codes](https://developers.openai.com/api/docs/guides/error-codes). For Gemini errors, see [Google's troubleshooting guide](https://ai.google.dev/gemini-api/docs/troubleshooting).
+
+### Guide mode and customer data
+
+When the selected key is missing or the provider fails, the assistant returns a labelled **Menu guide** response and an AI-unavailable notice. The guide can still use the current menu and the signed-in customer's records while the database is available. Assistant fallback logs contain only sanitized failure codes and HTTP statuses.
+
+AI requests include chat text, a limited in-stock menu, and the signed-in customer's recent order and upcoming reservation summaries. Profile addresses, payment records, and product image URLs are excluded. Both providers use structured responses and a 12-second provider timeout. OpenAI requests set `store: false`; Gemini data handling follows the Google API terms for your project. Conversation state stays in the assistant screen's memory and can be cleared with the new-conversation button.
+
+## Assistant API
+
+`POST /api/assistant/chat` requires the existing bearer token in the `Authorization` header.
 
 ```json
 {
   "message": "Recommend a coffee under Rs. 1,000",
-  "history": []
+  "history": [
+    { "role": "user", "content": "I would like a coffee." },
+    { "role": "assistant", "content": "What is your budget?" }
+  ]
 }
 ```
 
-Messages are limited to 1,000 characters and history to 10 user/assistant messages. Replies include `reply`, `mode` (`ai` or `guide`), real inventory `recommendations`, allowed navigation `actions`, and an optional guide `availability` notice inside `data`. Customer context is scoped to the signed-in user. The selected provider receives a limited menu and recent order/reservation summaries, excluding profile addresses and payment records. Chat text is sent to that provider in AI mode; customers should avoid including sensitive details. Both providers use structured output and a 12-second provider timeout. OpenAI requests additionally set `store: false`; see the [official Responses documentation](https://developers.openai.com/api/reference/resources/responses/methods/create) and [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses). Gemini data handling follows the Google API terms for your project.
+Messages are limited to 1,000 characters. History accepts up to 10 messages with `user` or `assistant` roles, each limited to 1,000 characters. Successful responses return `success: true` and a `data` object containing:
 
-The API limits assistant requests to 20 per minute per user in memory. Use a shared limiter for a multi-instance deployment. Chat stays in screen memory and can be cleared with the new-conversation button.
+| Field | Meaning |
+| --- | --- |
+| `reply` | Assistant or guide response text |
+| `mode` | `ai` or `guide` |
+| `recommendations` | Server-validated inventory items, up to three |
+| `actions` | Allowed navigation links to menu, orders, or reservations |
+| `availability` | Optional safe fallback code and customer-facing notice |
 
-## Checks
+Assistant requests are limited to 20 per minute per user in memory. Multi-instance deployments need a shared rate-limit store.
+
+## Development checks
+
+Run backend tests from `backend`:
 
 ```powershell
-cd backend
 npm test
 ```
 
-For environments that block Node test worker processes:
+These use mocked providers and database queries, covering validation, customer scoping, recommendations, provider selection, structured response parsing, failure diagnostics, and rate limiting. They do not require real AI keys or a running MongoDB instance.
+
+If your environment blocks Node's test worker processes:
 
 ```powershell
 node --test --test-isolation=none test/*.test.js
 ```
 
+Run these checks from `mobile`:
+
 ```powershell
-cd mobile
 npx tsc --noEmit
 npx expo export --platform web --max-workers 1
 npx expo export --platform android --output-dir dist/android-check --max-workers 1
 ```
 
-The assistant tests cover validation, customer scoping, recommendations, provider parsing/fallbacks, and rate limiting. A live AI check needs your server key; device interaction and real database checkout should be verified against your development environment before release.
+Live provider access needs a configured key. Verify device interaction and checkout against your development database before release.
+
+## License
+
+[MIT](LICENSE).
