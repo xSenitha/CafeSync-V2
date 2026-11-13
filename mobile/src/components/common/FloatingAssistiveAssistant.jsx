@@ -16,10 +16,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { FONTS } from '../../constants/typography';
 
-const BUTTON_SIZE = 58;
-const SNAP_MARGIN = 16;
-const IDLE_DELAY = 3500;
-const IDLE_OPACITY = 0.85;
+const BUTTON_SIZE = 50;
+const SNAP_MARGIN = 14;
+const IDLE_DELAY = 3000;
+const IDLE_OPACITY = 0.65;
 const ACTIVE_OPACITY = 1.0;
 
 const QUICK_PROMPTS = [
@@ -35,11 +35,16 @@ export default function FloatingAssistiveAssistant({ onPress }) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
-  // Initial docked placement (right edge, comfortable thumb zone)
+  const tabOffset = Platform.select({
+    web: 76,
+    default: Math.max(72, insets.bottom + 60),
+  });
+
+  // Initial docked placement (bottom right edge, comfortable thumb zone above tab bar)
   const initialX = windowWidth - BUTTON_SIZE - SNAP_MARGIN;
   const initialY = Math.max(
     insets.top + SNAP_MARGIN,
-    windowHeight - Math.max(64, insets.bottom + 58) - BUTTON_SIZE - 28
+    windowHeight - tabOffset - BUTTON_SIZE - 12
   );
 
   const pan = useRef(new Animated.ValueXY({ x: initialX, y: initialY })).current;
@@ -172,8 +177,12 @@ export default function FloatingAssistiveAssistant({ onPress }) {
     const midpoint = (windowWidth - BUTTON_SIZE) / 2;
     const targetX = currX < midpoint ? SNAP_MARGIN : windowWidth - BUTTON_SIZE - SNAP_MARGIN;
 
+    const tabOffset = Platform.select({
+      web: 76,
+      default: Math.max(72, insets.bottom + 60),
+    });
     const minY = Math.max(SNAP_MARGIN, insets.top + 8);
-    const maxY = windowHeight - Math.max(64, insets.bottom + 58) - BUTTON_SIZE - SNAP_MARGIN;
+    const maxY = Math.max(minY, windowHeight - tabOffset - BUTTON_SIZE - 10);
     const targetY = Math.min(Math.max(currY, minY), maxY);
 
     Animated.spring(pan, {
@@ -468,7 +477,7 @@ export default function FloatingAssistiveAssistant({ onPress }) {
               {
                 transform: [{ scale: auraAnim }],
                 opacity: auraOpacity,
-                borderColor: isDark ? '#D9774A' : '#E07A5F',
+                borderColor: isDark ? 'rgba(217, 119, 74, 0.35)' : 'rgba(217, 119, 74, 0.25)',
               },
             ]}
           />
@@ -494,7 +503,7 @@ export default function FloatingAssistiveAssistant({ onPress }) {
                   { transform: [{ scale: pulseAnim }] },
                 ]}
               >
-                <Ionicons name="sparkles" size={18} color="#FFFDF8" />
+                <Ionicons name="sparkles" size={16} color="#FFF8EE" />
               </Animated.View>
             </View>
 
@@ -568,70 +577,58 @@ const styles = StyleSheet.create({
     }),
   },
   outerDiscLight: {
-    backgroundColor: '#1E100A',
-    borderColor: 'rgba(217, 119, 74, 0.70)',
+    backgroundColor: '#342720',
+    borderColor: 'rgba(244, 237, 228, 0.32)',
   },
   outerDiscDark: {
-    backgroundColor: '#160B07',
-    borderColor: 'rgba(217, 119, 74, 0.80)',
+    backgroundColor: '#231812',
+    borderColor: 'rgba(244, 237, 228, 0.22)',
   },
   middleRing: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
   middleRingLight: {
-    backgroundColor: 'rgba(244, 237, 228, 0.12)',
-    borderColor: 'rgba(244, 237, 228, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(244, 237, 228, 0.26)',
   },
   middleRingDark: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderColor: 'rgba(217, 119, 74, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(244, 237, 228, 0.18)',
   },
   innerCore: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#D9774A',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#D9774A',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.5,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(217, 119, 74, 0.45)',
-      },
-    }),
   },
   statusPearl: {
     position: 'absolute',
     top: 2,
     right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
     backgroundColor: '#1A0C06',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   statusPearlInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22C55E',
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#34D399',
     ...Platform.select({
       web: {
-        boxShadow: '0 0 6px rgba(34, 197, 94, 0.8)',
+        boxShadow: '0 0 6px rgba(52, 211, 153, 0.9)',
       },
     }),
   },

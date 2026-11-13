@@ -64,8 +64,14 @@ const AdminNavigator = () => {
             {
               backgroundColor: colors.surface,
               borderTopColor: colors.divider,
-              height: Math.max(64, 58 + insets.bottom),
-              paddingBottom: Math.max(8, insets.bottom),
+              height: Platform.select({
+                web: 76,
+                default: Math.max(72, 60 + insets.bottom),
+              }),
+              paddingBottom: Platform.select({
+                web: 14,
+                default: Math.max(12, insets.bottom + 6),
+              }),
             },
           ],
           tabBarItemStyle: styles.tabItem,
@@ -84,7 +90,8 @@ const AdminNavigator = () => {
 const styles = StyleSheet.create({
   tabBar: {
     borderTopWidth: 1,
-    paddingTop: 8,
+    paddingTop: 6,
+    overflow: 'visible',
     ...Platform.select({
       ios: { shadowColor: '#2B1810', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.05, shadowRadius: 10 },
       android: { elevation: 10 },
@@ -93,20 +100,25 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     paddingTop: 2,
+    paddingBottom: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
     minHeight: TOUCH_TARGET.min,
   },
   iconWrap: {
-    width: 42,
-    height: 30,
+    width: 38,
+    height: 28,
     borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tabLabel: {
     fontSize: 10,
+    lineHeight: 13,
     fontWeight: '600',
     marginTop: 2,
     fontFamily: FONTS.sans,
+    textAlign: 'center',
   },
 });
 

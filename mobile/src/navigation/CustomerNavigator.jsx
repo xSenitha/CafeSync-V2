@@ -31,6 +31,15 @@ function TabNavigator() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
 
+  const tabHeight = Platform.select({
+    web: 76,
+    default: Math.max(72, 60 + insets.bottom),
+  });
+  const tabPaddingBottom = Platform.select({
+    web: 14,
+    default: Math.max(12, insets.bottom + 6),
+  });
+
   return (
     <Tab.Navigator
       initialRouteName="Home"
@@ -53,7 +62,7 @@ function TabNavigator() {
             >
               <Ionicons
                 name={focused ? tab.icon : `${tab.icon}-outline`}
-                size={21}
+                size={20}
                 color={focused ? (isDark ? colors.accent : colors.primary) : colors.textLight}
               />
             </View>
@@ -76,8 +85,8 @@ function TabNavigator() {
           {
             backgroundColor: colors.surface,
             borderTopColor: colors.divider,
-            height: Math.max(64, 58 + insets.bottom),
-            paddingBottom: Math.max(8, insets.bottom),
+            height: tabHeight,
+            paddingBottom: tabPaddingBottom,
           },
         ],
         tabBarItemStyle: styles.item,
@@ -130,7 +139,8 @@ const styles = StyleSheet.create({
   },
   bar: {
     borderTopWidth: 1,
-    paddingTop: 8,
+    paddingTop: 6,
+    overflow: 'visible',
     ...Platform.select({
       ios: {
         shadowColor: '#2B1810',
@@ -148,11 +158,14 @@ const styles = StyleSheet.create({
   },
   item: {
     paddingTop: 2,
+    paddingBottom: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
     minHeight: TOUCH_TARGET.min,
   },
   iconWrap: {
-    width: 44,
-    height: 30,
+    width: 38,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.md,
@@ -162,9 +175,11 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
+    lineHeight: 14,
     fontWeight: '500',
     fontFamily: FONTS.sans,
-    marginTop: 3,
+    marginTop: 2,
+    textAlign: 'center',
   },
   activeLabel: {
     fontWeight: '700',
