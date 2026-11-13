@@ -31,7 +31,7 @@ function TabNavigator() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
 
-  const tabHeight      = Platform.select({ web: 76, default: Math.max(72, 60 + insets.bottom) });
+  const tabHeight        = Platform.select({ web: 76, default: Math.max(72, 60 + insets.bottom) });
   const tabPaddingBottom = Platform.select({ web: 14, default: Math.max(12, insets.bottom + 6) });
 
   return (
@@ -92,57 +92,47 @@ function TabNavigator() {
   );
 }
 
-// CustomerTabsScreen renders ONLY the tab navigator — no floating orb here.
-// The orb lives at the CustomerNavigator level so it's never clipped by a Screen.
-function CustomerTabsScreen() {
-  return <TabNavigator />;
+function CustomerTabsScreen({ navigation }) {
+  return (
+    <View style={styles.tabsContainer}>
+      <TabNavigator />
+      <FloatingAssistiveAssistant
+        onPress={(initialMessage) =>
+          navigation.navigate('Assistant', initialMessage ? { initialMessage } : undefined)
+        }
+      />
+    </View>
+  );
 }
 
 export default function CustomerNavigator() {
   const { colors } = useTheme();
 
   return (
-    /*
-     * Root wrapper View so the Stack and the floating orb share the same
-     * parent coordinate space. The Stack fills flex:1; the orb is
-     * absolutely positioned on top via styles.orbLayer (absoluteFill +
-     * pointerEvents="box-none"), so it overlays everything without
-     * blocking any touches to the Stack content below it.
-     */
-    <View style={styles.root}>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-          animation: 'fade',
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+        animation: 'slide_from_right',
+      }}
+    >
+      <Stack.Screen name="CustomerTabs" component={CustomerTabsScreen} />
+      <Stack.Screen
+        name="Assistant"
+        component={AssistantScreen}
+        options={{
+          animation: 'slide_from_right',
         }}
-      >
-        <Stack.Screen name="CustomerTabs" component={CustomerTabsScreen} />
-        <Stack.Screen name="Assistant"    component={AssistantScreen} />
-        <Stack.Screen name="SavedCards"   component={SavedCardsScreen} />
-      </Stack.Navigator>
-
-      {/*
-       * Floating orb — rendered AFTER the Stack so it paints on top in
-       * native z-order. The wrapper has pointerEvents="box-none" so only
-       * the orb itself (and the popup card it creates) captures touches.
-       * Everything else passes through to the Stack screens normally.
-       */}
-      <View style={styles.orbLayer} pointerEvents="box-none">
-        <FloatingAssistiveAssistant />
-      </View>
-    </View>
+      />
+      <Stack.Screen name="SavedCards" component={SavedCardsScreen} />
+    </Stack.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  tabsContainer: {
     flex: 1,
-  },
-  orbLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 999,
-    elevation: 999,
+    position: 'relative',
   },
   bar: {
     borderTopWidth: 1,
