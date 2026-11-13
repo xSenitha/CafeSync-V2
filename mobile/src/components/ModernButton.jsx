@@ -1,37 +1,69 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../context/ThemeContext';
+import { RADIUS, TOUCH_TARGET } from '../constants/spacing';
+import { FONTS } from '../constants/typography';
+import { SHADOWS } from '../constants/colors';
 
-const ModernButton = ({ title, onPress, variant = 'primary', loading = false, disabled = false, style }) => {
+const ModernButton = ({
+  title,
+  onPress,
+  variant = 'primary',
+  loading = false,
+  disabled = false,
+  style,
+  textStyle,
+  icon,
+  accessibilityLabel,
+}) => {
+  const { colors } = useTheme();
+
   const getBackgroundColor = () => {
-    if (disabled) return COLORS.divider;
-    if (variant === 'secondary') return COLORS.secondary;
-    if (variant === 'outline') return COLORS.transparent;
-    return COLORS.primary;
+    if (disabled) return colors.divider;
+    if (variant === 'secondary') return colors.surfaceAlt;
+    if (variant === 'outline') return 'transparent';
+    if (variant === 'accent') return colors.accent;
+    return colors.primary;
   };
 
   const getTextColor = () => {
-    if (disabled) return COLORS.textLight;
-    if (variant === 'outline') return COLORS.primary;
-    return COLORS.white;
+    if (disabled) return colors.textLight;
+    if (variant === 'outline') return colors.primary;
+    if (variant === 'secondary') return colors.text;
+    if (variant === 'accent') return colors.white;
+    return colors.surface;
   };
+
+  const isOutline = variant === 'outline';
 
   return (
     <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       style={[
         styles.button,
-        { backgroundColor: getBackgroundColor() },
-        variant === 'outline' && styles.outline,
+        {
+          backgroundColor: getBackgroundColor(),
+          borderColor: isOutline ? colors.primary : colors.divider,
+          borderWidth: isOutline ? 1.5 : variant === 'secondary' ? 1 : 0,
+        },
+        variant === 'primary' && !disabled && SHADOWS.subtle.web,
         style,
       ]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
     >
       {loading ? (
-        <ActivityIndicator color={getTextColor()} />
+        <ActivityIndicator color={getTextColor()} size="small" />
       ) : (
-        <Text style={[styles.text, { color: getTextColor() }]}>{title}</Text>
+        <>
+          {icon ? <>{icon}</> : null}
+          <Text style={[styles.text, { color: getTextColor(), fontFamily: FONTS.sans }, textStyle]}>
+            {title}
+          </Text>
+        </>
       )}
     </TouchableOpacity>
   );
@@ -39,46 +71,30 @@ const ModernButton = ({ title, onPress, variant = 'primary', loading = false, di
 
 const styles = StyleSheet.create({
   button: {
-    height: 50,
-    borderRadius: 12,
+    minHeight: TOUCH_TARGET.buttonHeight,
+    borderRadius: RADIUS.base,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginVertical: 10,
+    marginVertical: 8,
+    flexDirection: 'row',
+    gap: 8,
     ...Platform.select({
       ios: {
-        shadowColor: COLORS.primaryDark,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
+        shadowColor: '#2B1810',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0px 4px 5px rgba(201, 83, 17, 0.2)',
-      },
-    }),
-  },
-  outline: {
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0,
-      },
-      android: {
-        elevation: 0,
-      },
-      web: {
-        boxShadow: 'none',
+        elevation: 2,
       },
     }),
   },
   text: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
 

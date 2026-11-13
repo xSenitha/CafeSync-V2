@@ -2,28 +2,22 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, Platform, RefreshControl,
-  Modal, TextInput, ScrollView, Animated, Dimensions
+  Modal, TextInput, ScrollView, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cardsAPI } from '../../api';
-import { COLORS } from '../../constants/colors';
+import { useTheme } from '../../context/ThemeContext';
 import { Alert } from '../../utils/alert';
+import { RADIUS, TOUCH_TARGET } from '../../constants/spacing';
+import { FONTS } from '../../constants/typography';
+import { SHADOWS } from '../../constants/colors';
+import CoffeeLoader from '../../components/common/CoffeeLoader';
 
-const { width } = Dimensions.get('window');
-
-const CARD_BRANDS = ['Visa', 'Mastercard', 'Amex', 'Other'];
 const BRAND_COLORS = {
-  Visa:       { main: '#1A1F71', accent: '#F7B731', bg: '#EDF0FF' },
-  Mastercard: { main: '#EB001B', accent: '#F79E1B', bg: '#FFF0F0' },
-  Amex:       { main: '#016FD0', accent: '#FFFFFF', bg: '#EAF4FF' },
-  Other:      { main: COLORS.secondary, accent: COLORS.textLight, bg: '#F3F4F6' },
-};
-
-const BRAND_ICONS = {
-  Visa: 'card',
-  Mastercard: 'card',
-  Amex: 'card',
-  Other: 'card-outline',
+  Visa: { main: '#1C2942', accent: '#D4AF37', text: '#FAF5EE' },
+  Mastercard: { main: '#3D1C1C', accent: '#E06B3E', text: '#FAF5EE' },
+  Amex: { main: '#1A3344', accent: '#6293B8', text: '#FAF5EE' },
+  Other: { main: '#2B1810', accent: '#C35E3D', text: '#FAF5EE' },
 };
 
 const formatExpiry = (month, year) => {
@@ -34,33 +28,38 @@ const formatExpiry = (month, year) => {
 
 const detectBrand = (num) => {
   if (num.startsWith('4')) return 'Visa';
-  if (['51','52','53','54','55'].some(p => num.startsWith(p)) || (parseInt(num.slice(0,4)) >= 2221 && parseInt(num.slice(0,4)) <= 2720)) return 'Mastercard';
-  if (['34','37'].some(p => num.startsWith(p))) return 'Amex';
+  if (['51', '52', '53', '54', '55'].some((p) => num.startsWith(p)) || (parseInt(num.slice(0, 4)) >= 2221 && parseInt(num.slice(0, 4)) <= 2720)) return 'Mastercard';
+  if (['34', '37'].some((p) => num.startsWith(p))) return 'Amex';
   return 'Other';
 };
 
-const SavedCardItem = ({ card, onSetDefault, onDelete, onEdit, isDeleting }) => {
+const SavedCardItem = ({ card, onSetDefault, onDelete, onEdit, isDeleting, colors }) => {
   const cfg = BRAND_COLORS[card.brand] || BRAND_COLORS.Other;
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   return (
     <Animated.View style={[styles.cardItem, { transform: [{ translateX: slideAnim }] }]}>
-      <View style={[styles.cardVisual, { backgroundColor: cfg.main }]}>
-        <View style={styles.cardChip} />
-        <Text style={styles.cardBrand}>{card.brand}</Text>
-        <Text style={styles.cardNumber}>•••• •••• •••• {card.last4}</Text>
+      <View style={[styles.cardVisual, { backgroundColor: cfg.main }, SHADOWS.card.web]}>
+        <View style={styles.cardVisualHeader}>
+          <View style={styles.cardChip} />
+          <Text style={[styles.cardBrand, { color: cfg.accent }]}>{card.brand}</Text>
+        </View>
+
+        <Text style={[styles.cardNumber, { color: cfg.text }]}>•••• •••• •••• {card.last4}</Text>
+
         <View style={styles.cardFooter}>
           <View>
             <Text style={styles.cardHolderLabel}>CARD HOLDER</Text>
-            <Text style={styles.cardHolderName}>{card.cardholderName}</Text>
+            <Text style={[styles.cardHolderName, { color: cfg.text }]}>{card.cardholderName}</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={styles.cardHolderLabel}>EXPIRES</Text>
-            <Text style={styles.cardHolderName}>{formatExpiry(card.expiryMonth, card.expiryYear)}</Text>
+            <Text style={[styles.cardHolderName, { color: cfg.text }]}>{formatExpiry(card.expiryMonth, card.expiryYear)}</Text>
           </View>
         </View>
+
         {card.isDefault && (
-          <View style={styles.defaultTag}>
+          <View style={[styles.defaultTag, { backgroundColor: colors.accent }]}>
             <Ionicons name="checkmark-circle" size={12} color="#fff" />
             <Text style={styles.defaultTagText}>Default</Text>
           </View>
@@ -69,26 +68,35 @@ const SavedCardItem = ({ card, onSetDefault, onDelete, onEdit, isDeleting }) => 
 
       <View style={styles.cardActions}>
         {!card.isDefault && (
-          <TouchableOpacity style={styles.actionChip} onPress={() => onSetDefault(card._id)}>
-            <Ionicons name="star-outline" size={14} color={COLORS.primary} />
-            <Text style={[styles.actionChipText, { color: COLORS.primary }]}>Set Default</Text>
+          <TouchableOpacity
+            style={[styles.actionChip, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+            onPress={() => onSetDefault(card._id)}
+            accessibilityRole="button"
+          >
+            <Ionicons name="star-outline" size={15} color={colors.primary} />
+            <Text style={[styles.actionChipText, { color: colors.primary }]}>Set Default</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={styles.actionChip} onPress={() => onEdit(card)}>
-          <Ionicons name="create-outline" size={14} color={COLORS.textMid} />
-          <Text style={styles.actionChipText}>Edit</Text>
+        <TouchableOpacity
+          style={[styles.actionChip, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+          onPress={() => onEdit(card)}
+          accessibilityRole="button"
+        >
+          <Ionicons name="create-outline" size={15} color={colors.textMid} />
+          <Text style={[styles.actionChipText, { color: colors.textMid }]}>Edit</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionChip, { borderColor: COLORS.danger + '30', backgroundColor: '#FEF2F2' }]}
+          style={[styles.actionChip, { backgroundColor: colors.dangerLight, borderColor: colors.danger + '30' }]}
           onPress={() => onDelete(card._id)}
           disabled={isDeleting}
+          accessibilityRole="button"
         >
           {isDeleting ? (
-            <ActivityIndicator size="small" color={COLORS.danger} />
+            <ActivityIndicator size="small" color={colors.danger} />
           ) : (
             <>
-              <Ionicons name="trash-outline" size={14} color={COLORS.danger} />
-              <Text style={[styles.actionChipText, { color: COLORS.danger }]}>Remove</Text>
+              <Ionicons name="trash-outline" size={15} color={colors.danger} />
+              <Text style={[styles.actionChipText, { color: colors.danger }]}>Remove</Text>
             </>
           )}
         </TouchableOpacity>
@@ -100,6 +108,7 @@ const SavedCardItem = ({ card, onSetDefault, onDelete, onEdit, isDeleting }) => 
 const EMPTY_FORM = { cardNumber: '', cardholderName: '', expiryMM: '', expiryYY: '', brand: 'Other' };
 
 const SavedCardsScreen = () => {
+  const { colors } = useTheme();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -114,15 +123,19 @@ const SavedCardsScreen = () => {
 
   useEffect(() => {
     fetchCards();
-    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-  }, []);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+  }, [fadeAnim]);
 
   const fetchCards = async () => {
     try {
       const res = await cardsAPI.getAll();
       setCards(res.data.data || []);
-    } catch (e) { console.log(e?.message); }
-    finally { setLoading(false); setRefreshing(false); }
+    } catch (e) {
+      console.log(e?.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const openAdd = () => {
@@ -151,8 +164,8 @@ const SavedCardsScreen = () => {
       errs.cardNumber = 'Enter a valid card number';
     }
     if (!form.cardholderName.trim()) errs.cardholderName = 'Cardholder name is required';
-    if (!form.expiryMM || parseInt(form.expiryMM) < 1 || parseInt(form.expiryMM) > 12) errs.expiry = 'Invalid month (01–12)';
-    if (!form.expiryYY || form.expiryYY.length !== 2) errs.expiry = 'Invalid year (2 digits, e.g. 27)';
+    if (!form.expiryMM || parseInt(form.expiryMM) < 1 || parseInt(form.expiryMM) > 12) errs.expiry = 'Month must be 01–12';
+    if (!form.expiryYY || form.expiryYY.length !== 2) errs.expiry = 'Year must be 2 digits (e.g. 27)';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -177,73 +190,87 @@ const SavedCardsScreen = () => {
           expiryMonth: parseInt(form.expiryMM),
           expiryYear: parseInt(`20${form.expiryYY}`),
         });
-        setCards(prev => prev.map(c => c._id === editCard._id ? res.data.data : c));
+        setCards((prev) => prev.map((c) => (c._id === editCard._id ? res.data.data : c)));
       } else {
         const res = await cardsAPI.add(payload);
-        setCards(prev => [...prev, res.data.data]);
+        setCards((prev) => [...prev, res.data.data]);
       }
       setShowModal(false);
     } catch (e) {
       Alert.alert('Error', e?.response?.data?.message || e?.message || 'Something went wrong');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = (id) => {
     Alert.alert('Remove Card', 'Are you sure you want to remove this saved card?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Remove', style: 'destructive',
+        text: 'Remove',
+        style: 'destructive',
         onPress: async () => {
           setDeleting(id);
           try {
             await cardsAPI.delete(id);
-            setCards(prev => prev.filter(c => c._id !== id));
-          } catch (e) { Alert.alert('Error', e?.message); }
-          finally { setDeleting(null); }
-        }
-      }
+            setCards((prev) => prev.filter((c) => c._id !== id));
+          } catch (e) {
+            Alert.alert('Error', e?.message);
+          } finally {
+            setDeleting(null);
+          }
+        },
+      },
     ]);
   };
 
   const handleSetDefault = async (id) => {
     try {
       await cardsAPI.update(id, { isDefault: true });
-      setCards(prev => prev.map(c => ({ ...c, isDefault: c._id === id })));
-    } catch (e) { Alert.alert('Error', e?.message); }
+      setCards((prev) => prev.map((c) => ({ ...c, isDefault: c._id === id })));
+    } catch (e) {
+      Alert.alert('Error', e?.message);
+    }
   };
 
   const handleCardNumberChange = (text) => {
     const digits = text.replace(/\D/g, '').slice(0, 16);
     const formatted = digits.replace(/(.{4})/g, '$1 ').trim();
     const brand = detectBrand(digits);
-    setForm(f => ({ ...f, cardNumber: formatted, brand }));
+    setForm((f) => ({ ...f, cardNumber: formatted, brand }));
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={[styles.headerSup, { color: colors.accent }]}>SAFE CHECKOUT</Text>
+            <Text style={[styles.headerTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+              Saved Cards
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: colors.primary }]}
+            onPress={openAdd}
+            accessibilityRole="button"
+            accessibilityLabel="Add new card"
+            activeOpacity={0.88}
+          >
+            <Ionicons name="add" size={18} color={colors.surface} />
+            <Text style={[styles.addBtnText, { color: colors.surface }]}>Add Card</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <FlatList
           data={cards}
-          keyExtractor={c => c._id}
+          keyExtractor={(c) => c._id}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCards(); }} tintColor={COLORS.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCards(); }} tintColor={colors.accent} />}
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={
-            <View>
-              <View style={styles.hero}>
-                <View style={styles.heroCircle} />
-                <Text style={styles.heroTitle}>Saved Cards</Text>
-                <Text style={styles.heroSub}>Manage your payment methods</Text>
-              </View>
-              <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.85}>
-                <Ionicons name="add-circle" size={22} color={COLORS.white} />
-                <Text style={styles.addBtnText}>Add New Card</Text>
-              </TouchableOpacity>
-              {cards.length > 0 && (
-                <Text style={styles.sectionTitle}>YOUR CARDS</Text>
-              )}
-            </View>
-          }
           renderItem={({ item }) => (
             <SavedCardItem
               card={item}
@@ -251,130 +278,115 @@ const SavedCardsScreen = () => {
               onDelete={handleDelete}
               onEdit={openEdit}
               isDeleting={deleting === item._id}
+              colors={colors}
             />
           )}
-          ListEmptyComponent={!loading && (
-            <View style={styles.empty}>
-              <Ionicons name="card-outline" size={72} color={COLORS.divider} />
-              <Text style={styles.emptyTitle}>No Saved Cards</Text>
-              <Text style={styles.emptySub}>Add a card to speed up checkout. Your cards are safely stored.</Text>
-            </View>
-          )}
-          ListFooterComponent={<View style={{ height: 40 }} />}
+          ListEmptyComponent={
+            loading ? (
+              <CoffeeLoader message="Loading saved cards…" size="compact" />
+            ) : (
+              <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                <Ionicons name="card-outline" size={48} color={colors.textLight} />
+                <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+                  No Saved Cards
+                </Text>
+                <Text style={[styles.emptySub, { color: colors.textLight }]}>
+                  Save a card to complete your orders swiftly without re-entering details.
+                </Text>
+              </View>
+            )
+          }
         />
       </Animated.View>
-      {loading && <View style={styles.loader}><ActivityIndicator size="large" color={COLORS.primary} /></View>}
 
-      <Modal visible={showModal} animationType="slide" transparent>
+      {/* Add / Edit Card Modal */}
+      <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
+          <View style={[styles.modalSheet, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editCard ? 'Edit Card' : 'Add New Card'}</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)} style={styles.closeBtn}>
-                <Ionicons name="close" size={22} color={COLORS.textLight} />
+              <Text style={[styles.modalTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+                {editCard ? 'Edit Card Details' : 'Add New Card'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowModal(false)}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceAlt }]}
+                accessibilityRole="button"
+              >
+                <Ionicons name="close" size={20} color={colors.textMid} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {/* Card Preview */}
-              <View style={[styles.previewCard, { backgroundColor: BRAND_COLORS[form.brand]?.main || COLORS.secondary }]}>
-                <View style={styles.cardChip} />
-                <Text style={styles.cardBrand}>{form.brand}</Text>
-                <Text style={styles.cardNumber}>
-                  {editCard
-                    ? `•••• •••• •••• ${form.cardNumber}`
-                    : (form.cardNumber || '•••• •••• •••• ••••')}
-                </Text>
-                <View style={styles.cardFooter}>
-                  <View>
-                    <Text style={styles.cardHolderLabel}>CARD HOLDER</Text>
-                    <Text style={styles.cardHolderName}>{form.cardholderName || 'YOUR NAME'}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.cardHolderLabel}>EXPIRES</Text>
-                    <Text style={styles.cardHolderName}>{form.expiryMM || 'MM'}/{form.expiryYY || 'YY'}</Text>
-                  </View>
-                </View>
-              </View>
-
+            <ScrollView showsVerticalScrollIndicator={false}>
               {!editCard && (
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Card Number</Text>
+                <>
+                  <Text style={[styles.inputLabel, { color: colors.textMid }]}>Card Number</Text>
                   <TextInput
-                    style={[styles.field, errors.cardNumber && styles.fieldError]}
+                    style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: errors.cardNumber ? colors.danger : colors.divider, color: colors.text }]}
+                    placeholder="1234 5678 9012 3456"
+                    placeholderTextColor={colors.textLight}
+                    keyboardType="numeric"
                     value={form.cardNumber}
                     onChangeText={handleCardNumberChange}
-                    placeholder="1234 5678 9012 3456"
-                    keyboardType="number-pad"
-                    maxLength={19}
                   />
-                  {errors.cardNumber && <Text style={styles.errText}>{errors.cardNumber}</Text>}
-                </View>
+                  {errors.cardNumber ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.cardNumber}</Text> : null}
+                </>
               )}
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Cardholder Name</Text>
-                <TextInput
-                  style={[styles.field, errors.cardholderName && styles.fieldError]}
-                  value={form.cardholderName}
-                  onChangeText={t => setForm(f => ({ ...f, cardholderName: t.toUpperCase() }))}
-                  placeholder="AS ON CARD"
-                  autoCapitalize="characters"
-                />
-                {errors.cardholderName && <Text style={styles.errText}>{errors.cardholderName}</Text>}
-              </View>
+              <Text style={[styles.inputLabel, { color: colors.textMid }]}>Cardholder Name</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: errors.cardholderName ? colors.danger : colors.divider, color: colors.text }]}
+                placeholder="Full name as printed on card"
+                placeholderTextColor={colors.textLight}
+                value={form.cardholderName}
+                onChangeText={(v) => setForm((p) => ({ ...p, cardholderName: v }))}
+                autoCapitalize="words"
+              />
+              {errors.cardholderName ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.cardholderName}</Text> : null}
 
-              <View style={styles.expiryRow}>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={styles.fieldLabel}>Exp. Month</Text>
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inputLabel, { color: colors.textMid }]}>Expiry Month</Text>
                   <TextInput
-                    style={[styles.field, errors.expiry && styles.fieldError]}
+                    style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: errors.expiry ? colors.danger : colors.divider, color: colors.text }]}
+                    placeholder="MM (e.g. 08)"
+                    placeholderTextColor={colors.textLight}
+                    keyboardType="numeric"
+                    maxLength={2}
                     value={form.expiryMM}
-                    onChangeText={t => setForm(f => ({ ...f, expiryMM: t.replace(/\D/g, '').slice(0, 2) }))}
-                    placeholder="MM"
-                    keyboardType="number-pad"
-                    maxLength={2}
+                    onChangeText={(v) => setForm((p) => ({ ...p, expiryMM: v }))}
                   />
                 </View>
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={styles.fieldLabel}>Exp. Year</Text>
+
+                <View style={{ width: 12 }} />
+
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inputLabel, { color: colors.textMid }]}>Expiry Year</Text>
                   <TextInput
-                    style={[styles.field, errors.expiry && styles.fieldError]}
-                    value={form.expiryYY}
-                    onChangeText={t => setForm(f => ({ ...f, expiryYY: t.replace(/\D/g, '').slice(0, 2) }))}
-                    placeholder="YY"
-                    keyboardType="number-pad"
+                    style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: errors.expiry ? colors.danger : colors.divider, color: colors.text }]}
+                    placeholder="YY (e.g. 28)"
+                    placeholderTextColor={colors.textLight}
+                    keyboardType="numeric"
                     maxLength={2}
+                    value={form.expiryYY}
+                    onChangeText={(v) => setForm((p) => ({ ...p, expiryYY: v }))}
                   />
                 </View>
               </View>
-              {errors.expiry && <Text style={styles.errText}>{errors.expiry}</Text>}
+              {errors.expiry ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.expiry}</Text> : null}
 
-              {!editCard && (
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Card Brand</Text>
-                  <View style={styles.brandRow}>
-                    {CARD_BRANDS.map(b => (
-                      <TouchableOpacity
-                        key={b}
-                        style={[styles.brandChip, form.brand === b && { backgroundColor: BRAND_COLORS[b].main, borderColor: BRAND_COLORS[b].main }]}
-                        onPress={() => setForm(f => ({ ...f, brand: b }))}
-                      >
-                        <Text style={[styles.brandChipText, form.brand === b && { color: '#fff' }]}>{b}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.securityNote}>
-                <Ionicons name="lock-closed" size={14} color={COLORS.success} />
-                <Text style={styles.securityText}>Only the last 4 digits are stored. Your full card number is never saved.</Text>
-              </View>
-
-              <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving}>
-                {saving ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.saveBtnText}>{editCard ? 'Save Changes' : 'Add Card'}</Text>}
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: colors.primary }, saving && { opacity: 0.6 }]}
+                onPress={handleSave}
+                disabled={saving}
+                accessibilityRole="button"
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.surface} />
+                ) : (
+                  <Text style={[styles.saveBtnText, { color: colors.surface }]}>
+                    {editCard ? 'Save Changes' : 'Add Card to Account'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -385,84 +397,159 @@ const SavedCardsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  loader: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(249,250,251,0.8)', justifyContent: 'center', alignItems: 'center' },
-
-  listContent: { paddingBottom: 20 },
-  hero: {
-    backgroundColor: COLORS.secondary,
-    paddingTop: Platform.OS === 'android' ? 40 : 20,
-    paddingBottom: 35, paddingHorizontal: 24,
-    borderBottomLeftRadius: 32, borderBottomRightRadius: 32,
+  container: { flex: 1 },
+  header: {
+    paddingTop: Platform.OS === 'android' ? 36 : 14,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    maxWidth: 1120,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  headerSup: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    fontFamily: FONTS.sans,
+    marginBottom: 2,
+  },
+  headerTitle: { fontSize: 24, fontWeight: '800' },
+  addBtn: {
+    minHeight: TOUCH_TARGET.min,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.base,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  addBtnText: { fontSize: 14, fontWeight: '700', fontFamily: FONTS.sans },
+  listContent: {
+    padding: 20,
+    paddingBottom: 100,
+    maxWidth: 1120,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  cardItem: { marginBottom: 20 },
+  cardVisual: {
+    borderRadius: RADIUS.xl,
+    padding: 20,
+    height: 170,
+    justifyContent: 'space-between',
+    position: 'relative',
     overflow: 'hidden',
   },
-  heroCircle: { position: 'absolute', top: -30, right: -20, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(255,255,255,0.07)' },
-  heroTitle: { fontSize: 28, fontWeight: '900', color: '#fff' },
-  heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.65)', marginTop: 4 },
-
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: COLORS.primary, borderRadius: 16, padding: 16,
-    marginHorizontal: 20, marginTop: 20, marginBottom: 8,
-    ...Platform.select({ ios: { shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12 }, android: { elevation: 4 } }),
+  cardVisualHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  addBtnText: { color: '#fff', fontWeight: '900', fontSize: 16 },
-  sectionTitle: { fontSize: 12, fontWeight: '800', color: COLORS.textLight, marginHorizontal: 24, marginTop: 24, marginBottom: 12, letterSpacing: 1, textTransform: 'uppercase' },
-
-  cardItem: { marginHorizontal: 20, marginBottom: 20 },
-  cardVisual: {
-    borderRadius: 20, padding: 22, minHeight: 160,
-    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 20 }, android: { elevation: 8 } }),
+  cardChip: {
+    width: 38,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#E8D49E',
+    borderWidth: 1,
+    borderColor: '#C6B27E',
   },
-  cardChip: { width: 36, height: 28, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.35)', marginBottom: 20 },
-  cardBrand: { position: 'absolute', top: 20, right: 22, fontSize: 16, fontWeight: '900', color: 'rgba(255,255,255,0.8)' },
-  cardNumber: { fontSize: 17, fontWeight: '700', color: '#fff', letterSpacing: 2.5, marginBottom: 20 },
+  cardBrand: { fontSize: 16, fontWeight: '800', letterSpacing: 0.8 },
+  cardNumber: { fontSize: 17, letterSpacing: 3, fontWeight: '700' },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between' },
-  cardHolderLabel: { fontSize: 9, color: 'rgba(255,255,255,0.6)', fontWeight: '700', letterSpacing: 0.8 },
-  cardHolderName: { fontSize: 13, fontWeight: '800', color: '#fff', marginTop: 2, letterSpacing: 0.5 },
-  defaultTag: { position: 'absolute', top: 20, left: 22, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  defaultTagText: { fontSize: 10, color: '#fff', fontWeight: '800' },
-
-  cardActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  cardHolderLabel: { fontSize: 9, letterSpacing: 1, color: 'rgba(255,255,255,0.6)', fontWeight: '700' },
+  cardHolderName: { fontSize: 12, fontWeight: '700', marginTop: 2, textTransform: 'uppercase' },
+  defaultTag: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.full,
+  },
+  defaultTagText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
   actionChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E7EB',
+    minHeight: TOUCH_TARGET.min,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.base,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  actionChipText: { fontSize: 12, fontWeight: '700', color: COLORS.textMid },
-
-  empty: { alignItems: 'center', marginTop: 60, paddingHorizontal: 40, gap: 14 },
-  emptyTitle: { fontSize: 20, fontWeight: '900', color: COLORS.text },
-  emptySub: { fontSize: 14, color: COLORS.textLight, textAlign: 'center', lineHeight: 22 },
-
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#F9FAFB', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: '92%' },
-  modalHandle: { width: 44, height: 4, borderRadius: 2, backgroundColor: '#D1D5DB', alignSelf: 'center', marginBottom: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 22, fontWeight: '900', color: COLORS.text },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
-
-  previewCard: {
-    borderRadius: 20, padding: 22, minHeight: 150, marginBottom: 28,
-    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 14 }, android: { elevation: 6 } }),
+  actionChipText: { fontSize: 13, fontWeight: '600', fontFamily: FONTS.sans },
+  empty: {
+    borderRadius: RADIUS.xl,
+    padding: 36,
+    alignItems: 'center',
+    borderWidth: 1,
+    marginTop: 20,
+    gap: 8,
   },
-
-  fieldGroup: { marginBottom: 16 },
-  fieldLabel: { fontSize: 12, fontWeight: '800', color: COLORS.textLight, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  field: { backgroundColor: '#fff', borderRadius: 14, padding: 15, fontSize: 15, color: COLORS.text, borderWidth: 1.5, borderColor: '#E5E7EB' },
-  fieldError: { borderColor: COLORS.danger },
-  errText: { fontSize: 12, color: COLORS.danger, marginTop: 4, fontWeight: '600' },
-  expiryRow: { flexDirection: 'row', gap: 14 },
-
-  brandRow: { flexDirection: 'row', gap: 10 },
-  brandChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#fff' },
-  brandChipText: { fontSize: 13, fontWeight: '700', color: COLORS.textMid },
-
-  securityNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#F0FDF4', padding: 14, borderRadius: 14, marginBottom: 20, borderWidth: 1, borderColor: '#D1FAE5' },
-  securityText: { fontSize: 12, color: COLORS.textMid, fontWeight: '600', flex: 1, lineHeight: 18 },
-  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 18, padding: 18, alignItems: 'center', marginBottom: 20 },
-  saveBtnText: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginTop: 6 },
+  emptySub: { fontSize: 13, textAlign: 'center', fontFamily: FONTS.sans, maxWidth: 300 },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSheet: {
+    borderRadius: RADIUS.xxl,
+    padding: 22,
+    width: '90%',
+    maxWidth: 440,
+    maxHeight: '85%',
+    borderWidth: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 20, fontWeight: '800' },
+  closeBtn: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inputLabel: { fontSize: 12, fontWeight: '600', marginBottom: 5, marginTop: 10, fontFamily: FONTS.sans },
+  input: {
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 14,
+    borderWidth: 1,
+    minHeight: TOUCH_TARGET.inputHeight,
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
+  },
+  row: { flexDirection: 'row' },
+  errText: { fontSize: 11, marginTop: 4, fontFamily: FONTS.sans },
+  saveBtn: {
+    minHeight: TOUCH_TARGET.buttonHeight,
+    borderRadius: RADIUS.base,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  saveBtnText: { fontSize: 15, fontWeight: '700', fontFamily: FONTS.sans },
 });
 
 export default SavedCardsScreen;

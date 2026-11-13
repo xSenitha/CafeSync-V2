@@ -5,84 +5,126 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { adminOrdersAPI, adminInventoryAPI, adminReservationsAPI, adminPaymentsAPI } from '../../api';
-import { COLORS } from '../../constants/colors';
+import { RADIUS, TOUCH_TARGET } from '../../constants/spacing';
+import { FONTS } from '../../constants/typography';
+import { SHADOWS } from '../../constants/colors';
 
-const StatCard = ({ icon, label, value, color, delay }) => {
+const StatCard = ({ icon, label, value, color, delay, colors }) => {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(anim, { toValue: 1, friction: 7, delay, useNativeDriver: true }).start();
-  }, []);
+  }, [anim, delay]);
   return (
-    <Animated.View style={[styles.statCard, { transform: [{ scale: anim }], opacity: anim, borderTopColor: color, borderTopWidth: 3 }]}>
-      <Ionicons name={icon} size={24} color={color} />
-      <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <Animated.View
+      style={[
+        styles.statCard,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.divider,
+          borderTopColor: color,
+          borderTopWidth: 3,
+          transform: [{ scale: anim }],
+          opacity: anim,
+        },
+        SHADOWS.card.web,
+      ]}
+    >
+      <Ionicons name={icon} size={22} color={color} />
+      <Text style={[styles.statValue, { color: colors.text, fontFamily: FONTS.serif }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.textLight }]}>{label}</Text>
     </Animated.View>
   );
 };
 
-const STATUS_COLORS = {
-  Pending: COLORS.warning, Preparing: COLORS.info,
-  Ready: COLORS.success, Completed: COLORS.textLight, Cancelled: COLORS.danger,
-};
-
 const DashboardScreen = () => {
   const { logout } = useContext(AuthContext);
+  const { colors } = useTheme();
+
   const [data, setData] = useState({ orders: [], inventory: [], reservations: [], payments: [] });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const headerAnim = useRef(new Animated.Value(-50)).current;
+  const headerAnim = useRef(new Animated.Value(-40)).current;
   const headerOpacity = useRef(new Animated.Value(0)).current;
+
+  const STATUS_COLORS = {
+    Pending: colors.warning,
+    Preparing: colors.accent,
+    Ready: colors.success,
+    Completed: colors.textLight,
+    Cancelled: colors.danger,
+  };
 
   useEffect(() => {
     fetchAll();
     Animated.parallel([
       Animated.spring(headerAnim, { toValue: 0, friction: 8, useNativeDriver: true }),
-      Animated.timing(headerOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+      Animated.timing(headerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [headerAnim, headerOpacity]);
 
   const fetchAll = async () => {
     try {
       const [o, i, r, p] = await Promise.all([
-        adminOrdersAPI.getAll(), adminInventoryAPI.getAll(),
-        adminReservationsAPI.getAll(), adminPaymentsAPI.getAll(),
+        adminOrdersAPI.getAll(),
+        adminInventoryAPI.getAll(),
+        adminReservationsAPI.getAll(),
+        adminPaymentsAPI.getAll(),
       ]);
       setData({
-        orders: o.data.data || [], inventory: i.data.data || [],
-        reservations: r.data.data || [], payments: p.data.data || [],
+        orders: o.data.data || [],
+        inventory: i.data.data || [],
+        reservations: r.data.data || [],
+        payments: p.data.data || [],
       });
-    } catch (e) { console.log(e?.message); }
-    finally { setLoading(false); setRefreshing(false); }
+    } catch (e) {
+      console.log(e?.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const pendingOrders  = data.orders.filter(o => o.status === 'Pending').length;
-  const unpaidOrders   = data.orders.filter(o => o.paymentStatus === 'Pending' && o.status !== 'Cancelled').length;
-  const totalRevenue   = data.payments.filter(p => p.status === 'Completed').reduce((s, p) => s + p.amount, 0);
-  const lowStock       = data.inventory.filter(i => i.stock < 5).length;
-  const todayRes       = data.reservations.filter(r => new Date(r.date).toDateString() === new Date().toDateString()).length;
-  const dineInCount    = data.orders.filter(o => (o.orderType || 'Dine-In') === 'Dine-In').length;
-  const takeawayCount  = data.orders.filter(o => o.orderType === 'Takeaway').length;
-  const deliveryCount  = data.orders.filter(o => o.orderType === 'Online Delivery').length;
-  const recentOrders   = data.orders.slice(0, 5);
+  const pendingOrders = data.orders.filter((o) => o.status === 'Pending').length;
+  const unpaidOrders = data.orders.filter((o) => o.paymentStatus === 'Pending' && o.status !== 'Cancelled').length;
+  const lowStock = data.inventory.filter((i) => i.stock < 5).length;
+  const todayRes = data.reservations.filter((r) => new Date(r.date).toDateString() === new Date().toDateString()).length;
+  const dineInCount = data.orders.filter((o) => (o.orderType || 'Dine-In') === 'Dine-In').length;
+  const takeawayCount = data.orders.filter((o) => o.orderType === 'Takeaway').length;
+  const deliveryCount = data.orders.filter((o) => o.orderType === 'Online Delivery').length;
+  const recentOrders = data.orders.slice(0, 5);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <Animated.View style={[styles.header, { transform: [{ translateY: headerAnim }], opacity: headerOpacity }]}>
-        <View style={styles.headerCircle1} />
-        <View style={styles.headerCircle2} />
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.divider,
+            transform: [{ translateY: headerAnim }],
+            opacity: headerOpacity,
+          },
+        ]}
+      >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.headerSup}>Admin Panel</Text>
-            <Text style={styles.headerTitle}>Dashboard</Text>
+            <Text style={[styles.headerSup, { color: colors.accent }]}>CAFE MANAGEMENT</Text>
+            <Text style={[styles.headerTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+              Dashboard
+            </Text>
           </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.8}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="log-out-outline" size={14} color={COLORS.primary} />
-              <Text style={styles.logoutText}>Out</Text>
-            </View>
+          <TouchableOpacity
+            style={[styles.logoutBtn, { backgroundColor: colors.surfaceAlt, borderColor: colors.divider }]}
+            onPress={logout}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Sign out from admin panel"
+          >
+            <Ionicons name="log-out-outline" size={16} color={colors.primary} />
+            <Text style={[styles.logoutText, { color: colors.primary }]}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -90,95 +132,97 @@ const DashboardScreen = () => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={COLORS.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={colors.accent} />}
       >
         {loading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
         ) : (
           <>
             {/* Stats Grid */}
-            <Text style={styles.sectionTitle}>Overview</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+              Daily Overview
+            </Text>
             <View style={styles.statsGrid}>
-              <StatCard icon="cart" label="Pending Orders" value={pendingOrders} color={COLORS.warning} delay={0} />
-              <StatCard icon="cash" label="Unpaid Orders" value={unpaidOrders} color={COLORS.danger} delay={80} />
-              <StatCard icon="calendar" label="Today's Bookings" value={todayRes} color={COLORS.info} delay={160} />
-              <StatCard icon="warning" label="Low Stock" value={lowStock} color={COLORS.primary} delay={240} />
+              <StatCard icon="cart" label="Pending Orders" value={pendingOrders} color={colors.warning} delay={0} colors={colors} />
+              <StatCard icon="cash" label="Unpaid Tabs" value={unpaidOrders} color={colors.danger} delay={60} colors={colors} />
+              <StatCard icon="calendar" label="Today's Tables" value={todayRes} color={colors.info} delay={120} colors={colors} />
+              <StatCard icon="warning" label="Low Roast Stock" value={lowStock} color={colors.accent} delay={180} colors={colors} />
             </View>
 
-            {/* Order Type Breakdown */}
-            <Text style={styles.sectionTitle}>Order Types</Text>
+            {/* Order Types */}
+            <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+              Dining Types
+            </Text>
             <View style={styles.summaryRow}>
               {[
-                { icon: 'restaurant', label: 'Dine-In',  value: dineInCount,   color: COLORS.secondary },
-                { icon: 'bag-handle', label: 'Takeaway', value: takeawayCount, color: COLORS.accent },
-                { icon: 'bicycle', label: 'Delivery', value: deliveryCount, color: COLORS.info },
-              ].map(item => (
-                <View key={item.label} style={[styles.summaryCard, { borderTopWidth: 3, borderTopColor: item.color }]}>
+                { icon: 'restaurant', label: 'Dine-In', value: dineInCount, color: colors.primary },
+                { icon: 'bag-handle', label: 'Takeaway', value: takeawayCount, color: colors.accent },
+                { icon: 'bicycle', label: 'Delivery', value: deliveryCount, color: colors.info },
+              ].map((item) => (
+                <View
+                  key={item.label}
+                  style={[
+                    styles.summaryCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.divider,
+                      borderTopColor: item.color,
+                    },
+                    SHADOWS.card.web,
+                  ]}
+                >
                   <Ionicons name={item.icon} size={18} color={item.color} />
-                  <Text style={[styles.summaryValue, { color: item.color }]}>{item.value}</Text>
-                  <Text style={styles.summaryLabel}>{item.label}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Summary Row */}
-            <View style={styles.summaryRow}>
-              {[
-                { icon: 'cube', label: 'Orders',      value: data.orders.length,      color: COLORS.primary },
-                { icon: 'restaurant', label: 'Menu Items',  value: data.inventory.length,   color: COLORS.warning },
-                { icon: 'calendar', label: 'Bookings',   value: data.reservations.length, color: COLORS.success },
-                { icon: 'card', label: 'Payments',   value: data.payments.length,    color: COLORS.accent },
-              ].map(item => (
-                <View key={item.label} style={styles.summaryCard}>
-                  <Ionicons name={item.icon} size={18} color={item.color} />
-                  <Text style={[styles.summaryValue, { color: item.color }]}>{item.value}</Text>
-                  <Text style={styles.summaryLabel}>{item.label}</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text, fontFamily: FONTS.serif }]}>{item.value}</Text>
+                  <Text style={[styles.summaryLabel, { color: colors.textLight }]}>{item.label}</Text>
                 </View>
               ))}
             </View>
 
             {/* Recent Orders */}
-            <Text style={styles.sectionTitle}>Recent Orders</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+              Recent Orders
+            </Text>
             {recentOrders.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Ionicons name="cart-outline" size={40} color={COLORS.divider} />
-                <Text style={styles.emptyText}>No orders yet</Text>
+              <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                <Ionicons name="cart-outline" size={38} color={colors.textLight} />
+                <Text style={[styles.emptyText, { color: colors.textLight }]}>No recent orders</Text>
               </View>
             ) : (
-              recentOrders.map(order => {
-                const typeEmoji = { 'Dine-In': '🪑', 'Takeaway': '🥡', 'Online Delivery': '🛵' }[order.orderType] || '🪑';
-                const payColor = order.paymentStatus === 'Paid' ? COLORS.success : order.paymentStatus === 'Failed' ? COLORS.danger : COLORS.warning;
+              recentOrders.map((order) => {
+                const payColor = order.paymentStatus === 'Paid' ? colors.success : order.paymentStatus === 'Failed' ? colors.danger : colors.warning;
                 return (
-                  <View key={order._id} style={styles.orderCard}>
-                    <View style={[styles.orderDot, { backgroundColor: STATUS_COLORS[order.status] }]} />
+                  <View
+                    key={order._id}
+                    style={[
+                      styles.orderCard,
+                      { backgroundColor: colors.surface, borderColor: colors.divider },
+                      SHADOWS.card.web,
+                    ]}
+                  >
+                    <View style={[styles.orderDot, { backgroundColor: STATUS_COLORS[order.status] || colors.primary }]} />
                     <View style={styles.orderInfo}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Ionicons 
-                          name={order.orderType === 'Dine-In' ? 'restaurant' : order.orderType === 'Takeaway' ? 'bag-handle' : 'bicycle'} 
-                          size={14} 
-                          color={COLORS.textMid} 
+                        <Ionicons
+                          name={order.orderType === 'Dine-In' ? 'restaurant-outline' : order.orderType === 'Takeaway' ? 'bag-handle-outline' : 'bicycle-outline'}
+                          size={14}
+                          color={colors.textMid}
                         />
-                        <Text style={styles.orderId}>#{order._id.slice(-6).toUpperCase()}</Text>
+                        <Text style={[styles.orderId, { color: colors.text }]}>#{order._id.slice(-6).toUpperCase()}</Text>
                       </View>
-                      <Text style={styles.orderMeta}>{order.items?.length || 0} items · Rs. {order.totalAmount?.toFixed(2)}</Text>
-                      {order.orderType === 'Dine-In' && order.tableNumber ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                          <Ionicons name="restaurant-outline" size={10} color={COLORS.textLight} />
-                          <Text style={styles.orderSubMeta}>Table {order.tableNumber}</Text>
-                        </View>
-                      ) : order.orderType === 'Online Delivery' && order.deliveryAddress ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                          <Ionicons name="location-outline" size={10} color={COLORS.textLight} />
-                          <Text style={styles.orderSubMeta} numberOfLines={1}>{order.deliveryAddress}</Text>
-                        </View>
-                      ) : null}
+                      <Text style={[styles.orderMeta, { color: colors.textMid }]}>
+                        {order.items?.length || 0} items · Rs. {order.totalAmount?.toFixed(2)}
+                      </Text>
                     </View>
                     <View style={{ gap: 4, alignItems: 'flex-end' }}>
-                      <View style={[styles.badge, { backgroundColor: STATUS_COLORS[order.status] + '18' }]}>
-                        <Text style={[styles.badgeText, { color: STATUS_COLORS[order.status] }]}>{order.status}</Text>
+                      <View style={[styles.badge, { backgroundColor: (STATUS_COLORS[order.status] || colors.primary) + '18' }]}>
+                        <Text style={[styles.badgeText, { color: STATUS_COLORS[order.status] || colors.primary }]}>
+                          {order.status}
+                        </Text>
                       </View>
                       <View style={[styles.badge, { backgroundColor: payColor + '18' }]}>
-                        <Text style={[styles.badgeText, { color: payColor }]}>{order.paymentStatus || 'Pending'}</Text>
+                        <Text style={[styles.badgeText, { color: payColor }]}>
+                          {order.paymentStatus || 'Pending'}
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -193,73 +237,93 @@ const DashboardScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1 },
   header: {
-    backgroundColor: COLORS.secondary,
-    paddingTop: Platform.OS === 'android' ? 36 : 16,
-    paddingBottom: 24, paddingHorizontal: 20,
-    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: { shadowColor: COLORS.secondary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12 },
-      android: { elevation: 6 },
-      web: { boxShadow: '0 6px 12px rgba(30,42,58,0.35)' },
-    }),
+    paddingTop: Platform.OS === 'android' ? 36 : 14,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
   },
-  headerCircle1: { position: 'absolute', top: -40, right: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
-  headerCircle2: { position: 'absolute', bottom: -50, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,107,53,0.1)' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerSup: { fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' },
-  headerTitle: { fontSize: 26, fontWeight: '900', color: COLORS.white },
-  logoutBtn: { backgroundColor: 'rgba(255,107,53,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderColor: COLORS.primary },
-  logoutText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
-  scroll: { padding: 16, paddingBottom: 40 },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, marginBottom: 12, marginTop: 8 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    maxWidth: 1120,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  headerSup: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    fontFamily: FONTS.sans,
+    marginBottom: 2,
+  },
+  headerTitle: { fontSize: 24, fontWeight: '800' },
+  logoutBtn: {
+    paddingHorizontal: 14,
+    minHeight: TOUCH_TARGET.min,
+    borderRadius: RADIUS.base,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  logoutText: { fontWeight: '700', fontSize: 13, fontFamily: FONTS.sans },
+  scroll: {
+    padding: 20,
+    paddingBottom: 80,
+    maxWidth: 1120,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12, marginTop: 10 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
   statCard: {
-    width: '47%', backgroundColor: COLORS.surface, borderRadius: 18,
-    padding: 16, alignItems: 'center', gap: 6,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8 },
-      android: { elevation: 3 },
-      web: { boxShadow: '0 3px 8px rgba(0,0,0,0.08)' },
-    }),
+    width: '48%',
+    borderRadius: RADIUS.xl,
+    padding: 16,
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
   },
-  statEmoji: { fontSize: 28 },
-  statValue: { fontSize: 20, fontWeight: '900' },
-  statLabel: { fontSize: 11, color: COLORS.textLight, textAlign: 'center' },
+  statValue: { fontSize: 22, fontWeight: '800' },
+  statLabel: { fontSize: 11, textAlign: 'center', fontFamily: FONTS.sans },
   summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   summaryCard: {
-    flex: 1, backgroundColor: COLORS.surface, borderRadius: 14,
-    padding: 12, alignItems: 'center', gap: 4,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 },
-      android: { elevation: 2 },
-      web: { boxShadow: '0 2px 6px rgba(0,0,0,0.06)' },
-    }),
+    flex: 1,
+    borderRadius: RADIUS.lg,
+    padding: 12,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderTopWidth: 3,
   },
-  summaryEmoji: { fontSize: 18 },
-  summaryValue: { fontSize: 16, fontWeight: '900' },
-  summaryLabel: { fontSize: 10, color: COLORS.textLight },
-  emptyCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 24, alignItems: 'center', gap: 8 },
-  emptyEmoji: { fontSize: 36 },
-  emptyText: { color: COLORS.textLight, fontSize: 14 },
+  summaryValue: { fontSize: 17, fontWeight: '800' },
+  summaryLabel: { fontSize: 11, fontFamily: FONTS.sans },
+  emptyCard: {
+    borderRadius: RADIUS.xl,
+    padding: 28,
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+  },
+  emptyText: { fontSize: 14, fontFamily: FONTS.sans },
   orderCard: {
-    backgroundColor: COLORS.surface, borderRadius: 16,
-    padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6 },
-      android: { elevation: 2 },
-      web: { boxShadow: '0 2px 6px rgba(0,0,0,0.05)' },
-    }),
+    borderRadius: RADIUS.lg,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+    borderWidth: 1,
   },
-  orderDot: { width: 10, height: 10, borderRadius: 5 },
+  orderDot: { width: 8, height: 8, borderRadius: 4 },
   orderInfo: { flex: 1 },
-  orderId: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  orderMeta: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
-  orderSubMeta: { fontSize: 11, color: COLORS.textLight, marginTop: 1 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  orderId: { fontSize: 14, fontWeight: '700', fontFamily: FONTS.sans },
+  orderMeta: { fontSize: 12, marginTop: 2, fontFamily: FONTS.sans },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.full },
+  badgeText: { fontSize: 10, fontWeight: '700', fontFamily: FONTS.sans },
 });
 
 export default DashboardScreen;

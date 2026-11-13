@@ -1,17 +1,43 @@
 import React from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import { FONTS } from '../constants/typography';
+import CoffeeLoader from './common/CoffeeLoader';
 
 export default function SplashScreen() {
-  return <View style={styles.screen}>
-    <View style={styles.icon}><Ionicons name="cafe-outline" size={42} color={COLORS.primary} /></View>
-    <Text style={styles.brand}>CafeSync.</Text>
-    <Text style={styles.caption}>A little time for yourself.</Text>
-    <ActivityIndicator accessibilityLabel="Loading CafeSync" color={COLORS.primary} style={{ marginTop: 28 }} />
-  </View>;
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <View style={styles.brandGroup}>
+        <Text style={[styles.brand, { color: colors.primary, fontFamily: FONTS.serif }]}>
+          Cafe<Text style={{ color: colors.accent }}>Sync</Text>
+          <Text style={{ color: colors.copper }}>.</Text>
+        </Text>
+      </View>
+
+      <CoffeeLoader
+        message="A little time for yourself"
+        subtext="Preparing your quiet cafe corner…"
+        size="normal"
+      />
+    </View>
+  );
 }
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' }, icon: { width: 88, height: 88, borderRadius: 28, backgroundColor: '#E8EEE6', alignItems: 'center', justifyContent: 'center', marginBottom: 22 },
-  brand: { fontSize: 32, fontWeight: '800', letterSpacing: -1.2, color: COLORS.primary }, caption: { fontSize: 14, color: COLORS.textLight, marginTop: 10 },
+  screen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  brandGroup: {
+    marginBottom: 8,
+  },
+  brand: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -1.2,
+  },
 });

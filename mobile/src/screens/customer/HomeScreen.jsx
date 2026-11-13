@@ -1,55 +1,90 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView,
   ActivityIndicator, Platform, useWindowDimensions, RefreshControl,
-  Image, Modal, TextInput,
+  Image, Modal, TextInput, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { COLORS } from '../../constants/colors';
+import { useTheme } from '../../context/ThemeContext';
 import { ordersAPI, reservationsAPI, menuAPI, paymentsAPI, cardsAPI } from '../../api';
 import apiClient from '../../api/client';
 import { Alert } from '../../utils/alert';
+import { RADIUS, TOUCH_TARGET } from '../../constants/spacing';
+import { FONTS } from '../../constants/typography';
+import { SHADOWS } from '../../constants/colors';
+import { MenuCardSkeleton } from '../../components/common/SkeletonLoader';
 
 const ORDER_TYPES = [
-  { key: 'Dine-In', icon: 'restaurant-outline', label: 'Dine-In', desc: 'Eat at the cafe' },
+  { key: 'Dine-In', icon: 'restaurant-outline', label: 'Dine-In', desc: 'Savor at the cafe' },
   { key: 'Takeaway', icon: 'bag-handle-outline', label: 'Takeaway', desc: 'Pick up & go' },
-  { key: 'Online Delivery', icon: 'bicycle-outline', label: 'Delivery', desc: 'Delivered to you' },
+  { key: 'Online Delivery', icon: 'bicycle-outline', label: 'Delivery', desc: 'Delivered warm' },
 ];
+
 const PAYMENT_OPTIONS = {
-  'Dine-In': [{ key: 'Cash', label: 'Cash', icon: 'cash-outline' }, { key: 'Card', label: 'Card (Debit/Credit)', icon: 'card-outline' }],
-  'Takeaway': [{ key: 'Cash', label: 'Cash', icon: 'cash-outline' }, { key: 'Card', label: 'Card (Debit/Credit)', icon: 'card-outline' }],
+  'Dine-In': [{ key: 'Cash', label: 'Cash at counter', icon: 'cash-outline' }, { key: 'Card', label: 'Card (Debit/Credit)', icon: 'card-outline' }],
+  'Takeaway': [{ key: 'Cash', label: 'Cash at counter', icon: 'cash-outline' }, { key: 'Card', label: 'Card (Debit/Credit)', icon: 'card-outline' }],
   'Online Delivery': [{ key: 'Cash', label: 'Cash on Delivery', icon: 'cash-outline' }, { key: 'Card', label: 'Card (Debit/Credit)', icon: 'card-outline' }],
 };
+
 const TABLES = Array.from({ length: 20 }, (_, i) => i + 1);
 const TIME_SLOTS = ['08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM'];
-const CATEGORY_ICONS = { All: 'grid-outline', Coffee: 'cafe-outline', Tea: 'leaf-outline', Snacks: 'fast-food-outline', Desserts: 'ice-cream-outline', Beverages: 'wine-outline', Other: 'restaurant-outline' };
+const CATEGORY_ICONS = {
+  All: 'grid-outline',
+  Coffee: 'cafe-outline',
+  Tea: 'leaf-outline',
+  Snacks: 'fast-food-outline',
+  Desserts: 'ice-cream-outline',
+  Beverages: 'wine-outline',
+  Other: 'restaurant-outline',
+};
 
-const MenuImage = ({ item }) => {
+const MenuImage = ({ item, colors }) => {
   const [failed, setFailed] = useState(false);
   const image = item.image;
   const uri = image && image !== 'no-photo.jpg'
     ? (/^https?:\/\//i.test(image) ? image : `${apiClient.defaults.baseURL.replace(/\/api\/?$/, '')}/uploads/${image}`)
     : null;
+
   useEffect(() => { setFailed(false); }, [image]);
+
   return (
-    <View style={styles.menuImageWrap}>
-      {uri && !failed ? <Image source={{ uri }} style={styles.menuImage} onError={() => setFailed(true)} accessibilityLabel={item.name} /> : (
+    <View style={[styles.menuImageWrap, { backgroundColor: colors.surfaceAlt }]}>
+      {uri && !failed ? (
+        <Image
+          source={{ uri }}
+          style={styles.menuImage}
+          onError={() => setFailed(true)}
+          accessibilityLabel={item.name}
+        />
+      ) : (
         <View style={styles.imageFallback}>
-          <View style={styles.imageRing}><Ionicons name={CATEGORY_ICONS[item.category] || 'restaurant-outline'} size={40} color={COLORS.primary} /></View>
-          <Text style={styles.imageCaption}>{item.category || 'Made for you'}</Text>
+          <View style={[styles.imageRing, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            <Ionicons name={CATEGORY_ICONS[item.category] || 'cafe-outline'} size={34} color={colors.primary} />
+          </View>
+          <Text style={[styles.imageCaption, { color: colors.textLight }]}>{item.category || 'Handcrafted'}</Text>
         </View>
       )}
-      {item.stock <= 0 && <View style={styles.soldOut}><Text style={styles.soldOutText}>Sold out</Text></View>}
+      {item.stock <= 0 && (
+        <View style={[styles.soldOut, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.soldOutText, { color: colors.danger }]}>Sold out</Text>
+        </View>
+      )}
     </View>
   );
 };
 
 const HomeScreen = ({ navigation, route }) => {
   const { user } = useContext(AuthContext);
-  const { cart, addToCart, removeFromCart, removeItem, cartCount, cartTotal } = useCart();
+  const { cart, addToCart, removeFromCart, removeItem, cartCount, cartTotal, clearCart } = useCart();
+  const { colors, isDark, toggleTheme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
+
+  const scrollRef = useRef(null);
+  const menuHeaderRef = useRef(null);
+  const cartBounceAnim = useRef(new Animated.Value(1)).current;
+
   const [orders, setOrders] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [menu, setMenu] = useState([]);
@@ -72,7 +107,6 @@ const HomeScreen = ({ navigation, route }) => {
   const [savedCards, setSavedCards] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
   const [loadingCards, setLoadingCards] = useState(false);
-  const { clearCart } = useCart();
 
   useEffect(() => { fetchData(); }, []);
 
@@ -98,8 +132,11 @@ const HomeScreen = ({ navigation, route }) => {
       setSavedCards(cards);
       const def = cards.find(c => c.isDefault) || cards[0];
       setSelectedCard(current => cards.find(card => card._id === current?._id) || def || null);
-    } catch (e) { console.log(e?.message); }
-    finally { setLoadingCards(false); }
+    } catch (e) {
+      console.log(e?.message);
+    } finally {
+      setLoadingCards(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -115,7 +152,9 @@ const HomeScreen = ({ navigation, route }) => {
     try {
       const res = await reservationsAPI.getAvailability();
       setBookedSlots(res.data.data || []);
-    } catch (e) { console.log(e?.message); }
+    } catch (e) {
+      console.log(e?.message);
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -143,14 +182,16 @@ const HomeScreen = ({ navigation, route }) => {
             guests: 1,
             date: new Date().toISOString().split('T')[0],
             time: reservationTime,
-            specialRequests: 'Auto-reserved via Order Checkout'
+            specialRequests: 'Auto-reserved via Order Checkout',
           });
-        } catch (e) { console.log('Reservation auto-create error', e.message); }
+        } catch (e) {
+          console.log('Reservation auto-create error', e.message);
+        }
       }
 
       const orderItems = Object.entries(cart).map(([id, qty]) => ({
         product: id,
-        quantity: qty.quantity
+        quantity: qty.quantity,
       }));
 
       const res = await ordersAPI.createOrder({
@@ -158,7 +199,7 @@ const HomeScreen = ({ navigation, route }) => {
         orderType,
         tableNumber,
         deliveryAddress,
-        paymentMethod
+        paymentMethod,
       });
 
       const order = res.data.data;
@@ -169,7 +210,7 @@ const HomeScreen = ({ navigation, route }) => {
           amount: cartTotal,
           paymentMethod: 'Card',
           cardId: selectedCard._id,
-          transactionId: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+          transactionId: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
         });
       }
 
@@ -179,7 +220,7 @@ const HomeScreen = ({ navigation, route }) => {
         tableNumber,
         reservationTime,
         paymentMethod,
-        total: cartTotal
+        total: cartTotal,
       });
       setOrderSuccess(true);
       clearCart();
@@ -193,7 +234,9 @@ const HomeScreen = ({ navigation, route }) => {
 
   const fetchData = async () => {
     const [ordRes, resRes, menuRes] = await Promise.allSettled([
-      ordersAPI.getMyOrders(), reservationsAPI.getMyReservations(), menuAPI.getAll(),
+      ordersAPI.getMyOrders(),
+      reservationsAPI.getMyReservations(),
+      menuAPI.getAll(),
     ]);
     if (ordRes.status === 'fulfilled') setOrders(ordRes.value.data.data || []);
     if (resRes.status === 'fulfilled') setReservations(resRes.value.data.data || []);
@@ -202,13 +245,16 @@ const HomeScreen = ({ navigation, route }) => {
       setMenu(menuRes.value.data.data || []);
       setMenuError('');
     } else {
-      setMenuError('We could not refresh the menu. Please try again.');
+      setMenuError('We could not refresh the menu. Please pull down to retry.');
     }
     setLoading(false);
     setRefreshing(false);
   };
 
-  const onRefresh = () => { setRefreshing(true); fetchData(); };
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
 
   const getGreeting = () => {
     const h = new Date().getHours();
@@ -217,180 +263,646 @@ const HomeScreen = ({ navigation, route }) => {
     return { text: 'Good Evening', icon: 'moon-outline' };
   };
 
-  const activeOrders = orders.filter(o => !['Completed', 'Cancelled'].includes(o.status));
-  const pendingRes = reservations.filter(r => ['Pending', 'Confirmed'].includes(r.status));
-  const categories = ['All', ...new Set(menu.map(item => item.category).filter(Boolean))];
-  const visibleMenu = menu.filter(item =>
-    (activeCat === 'All' || item.category === activeCat) &&
-    `${item.name} ${item.description || ''}`.toLowerCase().includes(search.trim().toLowerCase())
-  );
-  const contentWidth = Math.min(windowWidth, 1120) - (windowWidth < 380 ? 32 : 48);
-  const columns = windowWidth >= 1000 ? 4 : windowWidth >= 700 ? 3 : windowWidth >= 340 ? 2 : 1;
-  const cardWidth = (contentWidth - (columns - 1) * 16) / columns;
-  const addItem = item => {
+  const addItem = (item) => {
     if ((cart[item._id]?.quantity || 0) >= item.stock) {
       Alert.alert('Stock limit', 'You already have all available portions of this item in your bag.');
       return;
     }
     addToCart(item);
+
+    // Cart bounce micro-interaction
+    Animated.sequence([
+      Animated.timing(cartBounceAnim, { toValue: 1.18, duration: 120, useNativeDriver: true }),
+      Animated.timing(cartBounceAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
+    ]).start();
   };
 
+  const scrollToMenu = () => {
+    scrollRef.current?.scrollTo({ y: 380, animated: true });
+  };
+
+  const activeOrders = orders.filter((o) => !['Completed', 'Cancelled'].includes(o.status));
+  const pendingRes = reservations.filter((r) => ['Pending', 'Confirmed'].includes(r.status));
+  const categories = ['All', ...new Set(menu.map((item) => item.category).filter(Boolean))];
+  const visibleMenu = menu.filter(
+    (item) =>
+      (activeCat === 'All' || item.category === activeCat) &&
+      `${item.name} ${item.description || ''}`.toLowerCase().includes(search.trim().toLowerCase())
+  );
+
+  const contentWidth = Math.min(windowWidth, 1120) - (windowWidth < 380 ? 28 : 40);
+  const columns = windowWidth >= 1000 ? 4 : windowWidth >= 700 ? 3 : windowWidth >= 340 ? 2 : 1;
+  const cardWidth = (contentWidth - (columns - 1) * 16) / columns;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Top Brand Bar */}
+      <View style={[styles.topBar, { backgroundColor: colors.background, borderBottomColor: colors.divider }]}>
         <View style={styles.topBarInner}>
-          <View style={styles.brand}><View style={styles.brandMark}><Ionicons name="cafe" size={22} color={COLORS.white} /></View><Text style={styles.brandText}>cafe<Text style={styles.brandAccent}>sync</Text><Text style={styles.brandDot}>.</Text></Text></View>
-          <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate('Profile')} accessibilityRole="button" accessibilityLabel="Open your profile">
-            <Text style={styles.profileInitial}>{(user?.name || 'You').slice(0, 1).toUpperCase()}</Text>
-          </TouchableOpacity>
+          <View style={styles.brand}>
+            <View style={[styles.brandMark, { backgroundColor: colors.primary }]}>
+              <Ionicons name="cafe" size={20} color={colors.surface} />
+            </View>
+            <View>
+              <Text style={[styles.brandText, { color: colors.text, fontFamily: FONTS.serif }]}>
+                Cafe<Text style={{ color: colors.accent }}>Sync</Text>
+                <Text style={{ color: colors.copper }}>.</Text>
+              </Text>
+              <Text style={[styles.brandSub, { color: colors.textLight }]}>A little time for yourself</Text>
+            </View>
+          </View>
+
+          <View style={styles.topBarActions}>
+            <TouchableOpacity
+              style={[styles.themePill, { backgroundColor: colors.surfaceAlt, borderColor: colors.divider }]}
+              onPress={toggleTheme}
+              accessibilityRole="button"
+              accessibilityLabel={isDark ? 'Switch to Day Cafe theme' : 'Switch to Night Cafe theme'}
+            >
+              <Ionicons name={isDark ? 'sunny' : 'moon'} size={17} color={colors.accent} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.profileButton, { backgroundColor: colors.surfaceAlt, borderColor: colors.divider }]}
+              onPress={() => navigation.navigate('Profile')}
+              accessibilityRole="button"
+              accessibilityLabel="Open your profile"
+            >
+              <Text style={[styles.profileInitial, { color: colors.primary }]}>
+                {(user?.name || 'You').slice(0, 1).toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
+
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, windowWidth < 380 && { paddingHorizontal: 16 }]}
+        contentContainerStyle={[styles.scroll, windowWidth < 380 && { paddingHorizontal: 14 }]}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
       >
-        <View style={styles.greetingRow}><Ionicons name={getGreeting().icon} size={17} color={COLORS.accent} /><Text style={styles.greeting}>{getGreeting().text}, {user?.name?.split(' ')[0] || 'friend'}</Text></View>
-        <View style={[styles.hero, windowWidth >= 700 && styles.heroWide]}>
-          <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>YOUR DAILY MOMENT</Text>
-            <Text style={[styles.heroTitle, windowWidth >= 700 && { fontSize: 48, lineHeight: 56 }]}>A little pause.{'\n'}A better day.</Text>
-            <Text style={styles.heroDescription}>Find your next favorite, order something lovely, and make yourself at home.</Text>
-            <TouchableOpacity style={styles.heroButton} onPress={() => navigation.navigate('Reservations')} accessibilityRole="button"><Text style={styles.heroButtonText}>Find your table</Text><Ionicons name="arrow-forward" size={17} color={COLORS.white} /></TouchableOpacity>
-          </View>
-          {windowWidth >= 500 && <View style={styles.heroArt}><View style={styles.heroOrbit} /><View style={styles.heroCup}><Ionicons name="cafe-outline" size={100} color={COLORS.primary} /></View><View style={styles.heroArtLabel}><Ionicons name="heart-outline" size={14} color={COLORS.accent} /><Text style={styles.heroArtText}>A moment well spent</Text></View></View>}
+        {/* Friendly Greeting */}
+        <View style={styles.greetingRow}>
+          <Ionicons name={getGreeting().icon} size={16} color={colors.accent} />
+          <Text style={[styles.greeting, { color: colors.textMid, fontFamily: FONTS.sans }]}>
+            {getGreeting().text}, {user?.name?.split(' ')[0] || 'friend'}
+          </Text>
         </View>
 
-        <TouchableOpacity style={styles.assistantCard} activeOpacity={0.85} onPress={() => navigation.navigate('Assistant')} accessibilityRole="button" accessibilityLabel="Ask the cafe assistant for menu recommendations">
-          <View style={styles.assistantIcon}><Ionicons name="sparkles" size={24} color={COLORS.primary} /></View>
-          <View style={styles.assistantCopy}><Text style={styles.assistantEyebrow}>MEET YOUR CAFE COMPANION</Text><Text style={styles.assistantTitle}>Something good starts with a chat.</Text><Text style={styles.assistantDescription}>Find a favorite, check an order, or plan your visit.</Text></View>
-          <View style={styles.assistantArrow}><Ionicons name="arrow-forward" size={20} color={COLORS.primary} /></View>
+        {/* HERO / LANDING: Emotional Centerpiece */}
+        <View
+          style={[
+            styles.hero,
+            { backgroundColor: isDark ? colors.surfaceAlt : colors.surfaceAlt, borderColor: colors.divider },
+            SHADOWS.card.web,
+            windowWidth >= 700 && styles.heroWide,
+          ]}
+        >
+          <View style={styles.heroCopy}>
+            <View style={styles.taglineBadge}>
+              <Ionicons name="sparkles" size={12} color={colors.accent} />
+              <Text style={[styles.eyebrow, { color: colors.accent }]}>YOUR SLOW CAFE MOMENT</Text>
+            </View>
+
+            {/* Tagline as the emotional centerpiece */}
+            <Text
+              style={[
+                styles.heroTitle,
+                { color: colors.text, fontFamily: FONTS.serif },
+                windowWidth >= 700 && { fontSize: 44, lineHeight: 52 },
+              ]}
+            >
+              A little time{'\n'}for yourself.
+            </Text>
+
+            <Text style={[styles.heroDescription, { color: colors.textMid }]}>
+              Handcrafted roasts, warm bakery treats, and a quiet corner to unwind. Order ahead or find your cozy table.
+            </Text>
+
+            <View style={styles.heroActionRow}>
+              <TouchableOpacity
+                style={[styles.heroPrimaryBtn, { backgroundColor: colors.primary }, SHADOWS.subtle.web]}
+                onPress={scrollToMenu}
+                accessibilityRole="button"
+                accessibilityLabel="Explore the cafe menu"
+                activeOpacity={0.88}
+              >
+                <Text style={[styles.heroPrimaryBtnText, { color: colors.surface }]}>Explore Menu</Text>
+                <Ionicons name="arrow-down" size={17} color={colors.surface} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.heroSecondaryBtn, { borderColor: colors.divider, backgroundColor: colors.surface }]}
+                onPress={() => navigation.navigate('Reservations')}
+                accessibilityRole="button"
+                accessibilityLabel="Reserve a table"
+                activeOpacity={0.85}
+              >
+                <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+                <Text style={[styles.heroSecondaryBtnText, { color: colors.primary }]}>Book Table</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {windowWidth >= 640 && (
+            <View style={styles.heroArt}>
+              <View style={[styles.heroOrbit, { backgroundColor: colors.surface, borderColor: colors.divider }]} />
+              <View style={[styles.heroCup, { backgroundColor: colors.background, borderColor: colors.divider }]}>
+                <Ionicons name="cafe" size={88} color={colors.primary} />
+              </View>
+              <View style={[styles.heroArtLabel, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                <Ionicons name="heart" size={14} color={colors.accent} />
+                <Text style={[styles.heroArtText, { color: colors.textMid }]}>Brewed with patience</Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* AI Cafe Companion Banner */}
+        <TouchableOpacity
+          style={[styles.assistantCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+          activeOpacity={0.88}
+          onPress={() => navigation.navigate('Assistant')}
+          accessibilityRole="button"
+          accessibilityLabel="Ask the cafe assistant for recommendations"
+        >
+          <View style={[styles.assistantIcon, { backgroundColor: colors.accentSoft }]}>
+            <Ionicons name="sparkles" size={22} color={colors.accent} />
+          </View>
+          <View style={styles.assistantCopy}>
+            <Text style={[styles.assistantEyebrow, { color: colors.accent }]}>MEET YOUR CAFE COMPANION</Text>
+            <Text style={[styles.assistantTitle, { color: colors.text }]}>Need help choosing?</Text>
+            <Text style={[styles.assistantDescription, { color: colors.textMid }]}>
+              Ask about flavors, dietary picks, or check your orders.
+            </Text>
+          </View>
+          <View style={[styles.assistantArrow, { backgroundColor: colors.surfaceAlt }]}>
+            <Ionicons name="arrow-forward" size={18} color={colors.primary} />
+          </View>
         </TouchableOpacity>
 
-        <View style={styles.menuHeading}><View><Text style={styles.eyebrow}>FRESH FINDS, FAMILIAR FAVORITES</Text><Text style={styles.sectionTitle}>What&apos;s your mood?</Text></View><Text style={styles.menuCount}>{loading ? '' : `${menu.length} items`}</Text></View>
-        <View style={styles.searchBox}><Ionicons name="search-outline" size={20} color={COLORS.textLight} /><TextInput style={styles.searchInput} placeholder="Search coffee, treats, and more" placeholderTextColor={COLORS.textLight} value={search} onChangeText={setSearch} accessibilityLabel="Search the menu" returnKeyType="search" />{search.length > 0 && <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel="Clear menu search"><Ionicons name="close-circle" size={20} color={COLORS.textLight} /></TouchableOpacity>}</View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-          {categories.map(category => <TouchableOpacity key={category} style={[styles.categoryChip, category === activeCat && styles.categoryChipActive]} onPress={() => setActiveCat(category)} accessibilityRole="button" accessibilityState={{ selected: category === activeCat }}><Ionicons name={CATEGORY_ICONS[category] || 'restaurant-outline'} size={17} color={category === activeCat ? COLORS.white : COLORS.textMid} /><Text style={[styles.categoryText, category === activeCat && styles.categoryTextActive]}>{category}</Text></TouchableOpacity>)}
+        {/* Menu Section Header */}
+        <View ref={menuHeaderRef} style={styles.menuHeading}>
+          <View>
+            <Text style={[styles.sectionEyebrow, { color: colors.accent }]}>FRESH FINDS & SIGNATURE ROASTS</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+              What are you craving?
+            </Text>
+          </View>
+          <Text style={[styles.menuCount, { color: colors.textLight }]}>
+            {loading ? '' : `${visibleMenu.length} items`}
+          </Text>
+        </View>
+
+        {/* Search Input Box */}
+        <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <Ionicons name="search-outline" size={20} color={colors.textLight} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text, fontFamily: FONTS.sans }]}
+            placeholder="Search espresso, matcha, pastries..."
+            placeholderTextColor={colors.textLight}
+            value={search}
+            onChangeText={setSearch}
+            accessibilityLabel="Search the cafe menu"
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearch('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search text"
+              style={styles.searchClearBtn}
+            >
+              <Ionicons name="close-circle" size={20} color={colors.textLight} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Category Horizontal Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categories}
+        >
+          {categories.map((category) => {
+            const isActive = category === activeCat;
+            return (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryChip,
+                  {
+                    backgroundColor: isActive ? colors.primary : colors.surface,
+                    borderColor: isActive ? colors.primary : colors.divider,
+                  },
+                ]}
+                onPress={() => setActiveCat(category)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={CATEGORY_ICONS[category] || 'restaurant-outline'}
+                  size={16}
+                  color={isActive ? colors.surface : colors.textMid}
+                />
+                <Text
+                  style={[
+                    styles.categoryText,
+                    { color: isActive ? colors.surface : colors.textMid },
+                    isActive && styles.categoryTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
-        {!!menuError && <View style={styles.errorBanner} accessibilityRole="alert"><Ionicons name="cloud-offline-outline" size={20} color={COLORS.danger} /><Text style={styles.errorText}>{menuError}</Text><TouchableOpacity onPress={onRefresh} accessibilityRole="button"><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>}
-        {loading ? <View style={styles.emptyState}><ActivityIndicator size="large" color={COLORS.primary} /><Text style={styles.emptyDescription}>Preparing the menu for you...</Text></View> : visibleMenu.length === 0 ? <View style={styles.emptyState}><View style={styles.emptyIcon}><Ionicons name={search ? 'search-outline' : 'cafe-outline'} size={28} color={COLORS.primary} /></View><Text style={styles.emptyTitle}>{search || activeCat !== 'All' ? 'No matches just yet' : 'The menu is on its way'}</Text><Text style={styles.emptyDescription}>{search || activeCat !== 'All' ? 'Try another search or explore all our categories.' : 'Check back soon for something delicious.'}</Text>{(search || activeCat !== 'All') && <TouchableOpacity style={styles.resetButton} onPress={() => { setSearch(''); setActiveCat('All'); }}><Text style={styles.retryText}>Show all items</Text></TouchableOpacity>}</View> : (
-          <View style={styles.menuGrid}>{visibleMenu.map(item => {
-            const quantity = cart[item._id]?.quantity || 0;
-            const unavailable = item.stock <= 0;
-            return <View key={item._id} style={[styles.menuCard, { width: cardWidth }]}>
-              <MenuImage item={item} />
-              <View style={styles.menuCardBody}><Text style={styles.itemCategory}>{item.category}</Text><Text style={styles.itemName} numberOfLines={2}>{item.name}</Text><Text style={styles.itemDescription} numberOfLines={2}>{item.description || 'A little something to brighten your day.'}</Text>
-                <View style={styles.itemFooter}><Text style={styles.itemPrice}>Rs. {Number(item.price).toFixed(2)}</Text>
-                  {quantity > 0 ? <View style={styles.quantityControl}><TouchableOpacity style={styles.quantityButton} onPress={() => removeFromCart(item._id)} accessibilityRole="button" accessibilityLabel={`Remove one ${item.name}`}><Ionicons name="remove" size={16} color={COLORS.primary} /></TouchableOpacity><Text style={styles.quantity}>{quantity}</Text><TouchableOpacity style={styles.quantityButton} onPress={() => addItem(item)} disabled={quantity >= item.stock} accessibilityRole="button" accessibilityLabel={`Add one ${item.name}`} accessibilityState={{ disabled: quantity >= item.stock }}><Ionicons name="add" size={16} color={quantity >= item.stock ? COLORS.textLight : COLORS.primary} /></TouchableOpacity></View> : <TouchableOpacity style={[styles.addButton, unavailable && styles.addButtonDisabled]} disabled={unavailable} onPress={() => addItem(item)} accessibilityRole="button" accessibilityLabel={`Add ${item.name} to bag`} accessibilityState={{ disabled: unavailable }}><Ionicons name="add" size={22} color={unavailable ? COLORS.textLight : COLORS.white} /></TouchableOpacity>}
-                </View>
-              </View>
-            </View>;
-          })}</View>
+        {/* Error Banner if Menu Load Fails */}
+        {!!menuError && (
+          <View style={[styles.errorBanner, { backgroundColor: colors.surface, borderColor: colors.danger }]} accessibilityRole="alert">
+            <Ionicons name="cloud-offline-outline" size={20} color={colors.danger} />
+            <Text style={[styles.errorText, { color: colors.textMid }]}>{menuError}</Text>
+            <TouchableOpacity onPress={onRefresh} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
+              <Text style={[styles.retryText, { color: colors.primary }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
-        <View style={styles.activityHeading}><Text style={styles.sectionTitle}>Your cafe, at a glance</Text></View>
-        {activityError ? <TouchableOpacity style={styles.activityNotice} onPress={onRefresh}><Ionicons name="refresh-outline" size={18} color={COLORS.primary} /><Text style={styles.activityNoticeText}>Tap to refresh your orders and reservations.</Text></TouchableOpacity> : <View style={styles.activityRow}>
-          <TouchableOpacity style={styles.activityCard} onPress={() => navigation.navigate('Orders')} accessibilityRole="button"><View style={styles.activityIcon}><Ionicons name="bag-handle-outline" size={22} color={COLORS.primary} /></View><Text style={styles.activityValue}>{loading ? '?' : activeOrders.length}</Text><Text style={styles.activityLabel}>Active orders</Text><Ionicons style={styles.activityArrow} name="arrow-forward" size={17} color={COLORS.textLight} /></TouchableOpacity>
-          <TouchableOpacity style={styles.activityCard} onPress={() => navigation.navigate('Reservations')} accessibilityRole="button"><View style={[styles.activityIcon, { backgroundColor: '#F1E8DC' }]}><Ionicons name="calendar-outline" size={22} color={COLORS.accent} /></View><Text style={styles.activityValue}>{loading ? '?' : pendingRes.length}</Text><Text style={styles.activityLabel}>Reservations</Text><Ionicons style={styles.activityArrow} name="arrow-forward" size={17} color={COLORS.textLight} /></TouchableOpacity>
-        </View>}
-        <Text style={styles.footerNote}>Good food. Good company. Your little everyday ritual.</Text>
+        {/* Menu Grid or Skeleton Loader */}
+        {loading ? (
+          <View style={styles.menuGrid}>
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <MenuCardSkeleton key={idx} width={cardWidth} />
+            ))}
+          </View>
+        ) : visibleMenu.length === 0 ? (
+          <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
+              <Ionicons name={search ? 'search-outline' : 'cafe-outline'} size={32} color={colors.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+              {search || activeCat !== 'All' ? 'No matches just yet' : 'The menu is brewing'}
+            </Text>
+            <Text style={[styles.emptyDescription, { color: colors.textLight }]}>
+              {search || activeCat !== 'All'
+                ? 'Try searching with another word or view all categories.'
+                : 'Our baristas are preparing fresh offerings. Check back shortly.'}
+            </Text>
+            {(search || activeCat !== 'All') && (
+              <TouchableOpacity
+                style={[styles.resetButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => { setSearch(''); setActiveCat('All'); }}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.retryText, { color: colors.primary }]}>Show all items</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={styles.menuGrid}>
+            {visibleMenu.map((item) => {
+              const quantity = cart[item._id]?.quantity || 0;
+              const unavailable = item.stock <= 0;
+              return (
+                <View
+                  key={item._id}
+                  style={[
+                    styles.menuCard,
+                    { width: cardWidth, backgroundColor: colors.surface, borderColor: colors.divider },
+                    SHADOWS.card.web,
+                  ]}
+                >
+                  <MenuImage item={item} colors={colors} />
+                  <View style={styles.menuCardBody}>
+                    <Text style={[styles.itemCategory, { color: colors.accent }]}>
+                      {item.category?.toUpperCase() || 'CAFE'}
+                    </Text>
+                    <Text
+                      style={[styles.itemName, { color: colors.text, fontFamily: FONTS.serif }]}
+                      numberOfLines={2}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text
+                      style={[styles.itemDescription, { color: colors.textLight }]}
+                      numberOfLines={2}
+                    >
+                      {item.description || 'Made with care for your relaxing break.'}
+                    </Text>
+
+                    <View style={styles.itemFooter}>
+                      <Text style={[styles.itemPrice, { color: colors.text }]}>
+                        Rs. {Number(item.price).toFixed(2)}
+                      </Text>
+
+                      {quantity > 0 ? (
+                        <View style={[styles.quantityControl, { backgroundColor: colors.surfaceAlt, borderColor: colors.divider }]}>
+                          <TouchableOpacity
+                            style={styles.quantityButton}
+                            onPress={() => removeFromCart(item._id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove one ${item.name}`}
+                          >
+                            <Ionicons name="remove" size={16} color={colors.primary} />
+                          </TouchableOpacity>
+                          <Text style={[styles.quantity, { color: colors.primary }]}>{quantity}</Text>
+                          <TouchableOpacity
+                            style={styles.quantityButton}
+                            onPress={() => addItem(item)}
+                            disabled={quantity >= item.stock}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Add one ${item.name}`}
+                            accessibilityState={{ disabled: quantity >= item.stock }}
+                          >
+                            <Ionicons
+                              name="add"
+                              size={16}
+                              color={quantity >= item.stock ? colors.textLight : colors.primary}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.addButton,
+                            { backgroundColor: unavailable ? colors.surfaceAlt : colors.primary },
+                          ]}
+                          disabled={unavailable}
+                          onPress={() => addItem(item)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Add ${item.name} to order`}
+                          accessibilityState={{ disabled: unavailable }}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons
+                            name="add"
+                            size={22}
+                            color={unavailable ? colors.textLight : colors.surface}
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Quick Activity Cards */}
+        <View style={styles.activityHeading}>
+          <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+            Your Cafe Ritual
+          </Text>
+        </View>
+
+        {activityError ? (
+          <TouchableOpacity
+            style={[styles.activityNotice, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+            onPress={onRefresh}
+          >
+            <Ionicons name="refresh-outline" size={18} color={colors.primary} />
+            <Text style={[styles.activityNoticeText, { color: colors.textMid }]}>
+              Tap to refresh your orders and reservations.
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.activityRow}>
+            <TouchableOpacity
+              style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+              onPress={() => navigation.navigate('Orders')}
+              accessibilityRole="button"
+              activeOpacity={0.85}
+            >
+              <View style={[styles.activityIcon, { backgroundColor: colors.accentSoft }]}>
+                <Ionicons name="bag-handle-outline" size={22} color={colors.accent} />
+              </View>
+              <Text style={[styles.activityValue, { color: colors.text }]}>
+                {loading ? '…' : activeOrders.length}
+              </Text>
+              <Text style={[styles.activityLabel, { color: colors.textMid }]}>Active orders</Text>
+              <Ionicons style={styles.activityArrow} name="arrow-forward" size={16} color={colors.textLight} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+              onPress={() => navigation.navigate('Reservations')}
+              accessibilityRole="button"
+              activeOpacity={0.85}
+            >
+              <View style={[styles.activityIcon, { backgroundColor: colors.surfaceAlt }]}>
+                <Ionicons name="calendar-outline" size={22} color={colors.primary} />
+              </View>
+              <Text style={[styles.activityValue, { color: colors.text }]}>
+                {loading ? '…' : pendingRes.length}
+              </Text>
+              <Text style={[styles.activityLabel, { color: colors.textMid }]}>Reservations</Text>
+              <Ionicons style={styles.activityArrow} name="arrow-forward" size={16} color={colors.textLight} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <Text style={[styles.footerNote, { color: colors.textLight }]}>
+          CafeSync · A little time for yourself.
+        </Text>
       </ScrollView>
-      {cartCount > 0 && <View pointerEvents="box-none" style={styles.cartDock}><TouchableOpacity style={[styles.floatingCart, { width: Math.min(contentWidth, 600) }]} onPress={() => { setOrderSuccess(false); setShowCheckout(true); }} activeOpacity={0.9} accessibilityRole="button" accessibilityLabel={`Review bag with ${cartCount} items, total ${cartTotal.toFixed(2)} rupees`}><View style={styles.cartInfo}><View style={styles.cartBadge}><Text style={styles.cartBadgeText}>{cartCount}</Text></View><View><Text style={styles.cartLabel}>Review your bag</Text><Text style={styles.floatingCartTotal}>Rs. {cartTotal.toFixed(2)}</Text></View></View><View style={styles.checkoutArrow}><Ionicons name="arrow-forward" size={22} color={COLORS.white} /></View></TouchableOpacity></View>}
-      {/* Checkout Modal */}
-      <Modal visible={showCheckout} animationType="slide" transparent onRequestClose={() => !placing && setShowCheckout(false)}>
+
+      {/* Floating Bottom Cart Dock (Thumb Reach) */}
+      {cartCount > 0 && (
+        <View pointerEvents="box-none" style={styles.cartDock}>
+          <Animated.View style={{ transform: [{ scale: cartBounceAnim }], width: Math.min(contentWidth, 600) }}>
+            <TouchableOpacity
+              style={[styles.floatingCart, { backgroundColor: colors.primary }, SHADOWS.floating.web]}
+              onPress={() => {
+                setOrderSuccess(false);
+                setShowCheckout(true);
+              }}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel={`Review bag with ${cartCount} items, total ${cartTotal.toFixed(2)} rupees`}
+            >
+              <View style={styles.cartInfo}>
+                <View style={[styles.cartBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.cartBadgeText, { color: colors.white }]}>{cartCount}</Text>
+                </View>
+                <View>
+                  <Text style={[styles.cartLabel, { color: colors.surfaceAlt }]}>Review your bag</Text>
+                  <Text style={[styles.floatingCartTotal, { color: colors.surface }]}>
+                    Rs. {cartTotal.toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.checkoutArrow, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+                <Ionicons name="arrow-forward" size={20} color={colors.surface} />
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      )}
+
+      {/* Checkout Bottom Sheet Modal */}
+      <Modal
+        visible={showCheckout}
+        animationType="slide"
+        transparent
+        onRequestClose={() => !placing && setShowCheckout(false)}
+      >
         <View style={styles.overlay}>
-          <View style={[styles.sheet, { width: Math.min(windowWidth, 640), alignSelf: 'center' }]}>
-            <View style={styles.sheetHandle} />
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.divider,
+                width: Math.min(windowWidth, 640),
+              },
+            ]}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+
             {orderSuccess ? (
               <View style={styles.successWrap}>
-                <Ionicons name="checkmark-circle" size={80} color={COLORS.success} style={{ marginBottom: 10 }} />
-                <Text style={styles.successTitle}>Order Placed!</Text>
-                <Text style={styles.successSub}>You can follow its progress in Orders.</Text>
+                <Ionicons name="checkmark-circle" size={76} color={colors.success} style={{ marginBottom: 12 }} />
+                <Text style={[styles.successTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+                  Order Received!
+                </Text>
+                <Text style={[styles.successSub, { color: colors.textMid }]}>
+                  We are preparing your handcrafted order with care.
+                </Text>
+
                 {lastOrder && (
-                  <View style={styles.successDetails}>
+                  <View style={[styles.successDetails, { backgroundColor: colors.surfaceAlt, borderColor: colors.divider }]}>
                     <View style={styles.successRow}>
-                      <Text style={styles.successDetailLabel}>Order Type</Text>
-                      <Text style={styles.successDetailValue}>{lastOrder.orderType}</Text>
+                      <Text style={[styles.successDetailLabel, { color: colors.textLight }]}>Order Type</Text>
+                      <Text style={[styles.successDetailValue, { color: colors.text }]}>{lastOrder.orderType}</Text>
                     </View>
                     {lastOrder.tableNumber && (
                       <View style={styles.successRow}>
-                        <Text style={styles.successDetailLabel}>Table</Text>
-                        <Text style={styles.successDetailValue}>#{lastOrder.tableNumber} at {lastOrder.reservationTime}</Text>
+                        <Text style={[styles.successDetailLabel, { color: colors.textLight }]}>Table</Text>
+                        <Text style={[styles.successDetailValue, { color: colors.text }]}>
+                          #{lastOrder.tableNumber} at {lastOrder.reservationTime}
+                        </Text>
                       </View>
                     )}
                     <View style={styles.successRow}>
-                      <Text style={styles.successDetailLabel}>Payment</Text>
-                      <Text style={styles.successDetailValue}>{lastOrder.paymentMethod}</Text>
+                      <Text style={[styles.successDetailLabel, { color: colors.textLight }]}>Payment</Text>
+                      <Text style={[styles.successDetailValue, { color: colors.text }]}>{lastOrder.paymentMethod}</Text>
                     </View>
-                    <View style={[styles.successRow, styles.successTotalRow]}>
-                      <Text style={styles.successTotalLabel}>Total</Text>
-                      <Text style={styles.successTotalValue}>Rs. {lastOrder.total.toFixed(2)}</Text>
+                    <View style={[styles.successRow, styles.successTotalRow, { borderTopColor: colors.divider }]}>
+                      <Text style={[styles.successTotalLabel, { color: colors.text }]}>Total Amount</Text>
+                      <Text style={[styles.successTotalValue, { color: colors.primary }]}>
+                        Rs. {lastOrder.total.toFixed(2)}
+                      </Text>
                     </View>
                   </View>
                 )}
-                <TouchableOpacity style={styles.successBtn} onPress={() => { setShowCheckout(false); navigation.navigate('Orders'); }}>
-                  <Text style={styles.successBtnText}>Track Order</Text>
+
+                <TouchableOpacity
+                  style={[styles.successBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    setShowCheckout(false);
+                    navigation.navigate('Orders');
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.successBtnText, { color: colors.surface }]}>Track in Orders</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
                 <View style={styles.sheetHeader}>
-                  <Text style={styles.sheetTitle}>Checkout</Text>
-                  <TouchableOpacity onPress={() => setShowCheckout(false)} style={styles.closeBtn}>
-                    <Ionicons name="close" size={22} color={COLORS.textLight} />
+                  <View>
+                    <Text style={[styles.sheetTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+                      Review Bag
+                    </Text>
+                    <Text style={[styles.sheetSub, { color: colors.textLight }]}>
+                      {cartCount} {cartCount === 1 ? 'item' : 'items'} ready for checkout
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setShowCheckout(false)}
+                    style={[styles.closeBtn, { backgroundColor: colors.surfaceAlt }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close checkout dialog"
+                  >
+                    <Ionicons name="close" size={20} color={colors.textMid} />
                   </TouchableOpacity>
                 </View>
 
-                {/* Cart summary */}
-                <View style={styles.cartItems}>
+                {/* Cart Items List */}
+                <View style={[styles.cartItems, { backgroundColor: colors.surfaceAlt, borderColor: colors.divider }]}>
                   {Object.entries(cart).length === 0 ? (
-                    <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                      <Ionicons name="cart-outline" size={40} color={COLORS.textLight} />
-                      <Text style={{ color: COLORS.textLight, marginTop: 10, fontWeight: '600' }}>Your cart is empty</Text>
+                    <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                      <Ionicons name="bag-outline" size={44} color={colors.textLight} />
+                      <Text style={{ color: colors.textMid, marginTop: 10, fontWeight: '600' }}>
+                        Your bag is currently empty
+                      </Text>
                       <TouchableOpacity
-                        style={[styles.successBtn, { marginTop: 15, paddingVertical: 10 }]}
+                        style={[styles.successBtn, { marginTop: 16, paddingVertical: 12, backgroundColor: colors.primary }]}
                         onPress={() => setShowCheckout(false)}
                       >
-                        <Text style={styles.successBtnText}>Back to Menu</Text>
+                        <Text style={[styles.successBtnText, { color: colors.surface }]}>Back to Menu</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <>
                       {Object.entries(cart).map(([id, { item, quantity }]) => (
-                        <View key={id} style={styles.cartRow}>
+                        <View key={id} style={[styles.cartRow, { borderBottomColor: colors.divider }]}>
                           <View style={{ flex: 1 }}>
-                            <Text style={styles.cartItemName} numberOfLines={1}>{item.name}</Text>
-                            <Text style={styles.cartItemPrice}>Rs. {Number(item.price).toFixed(2)}</Text>
+                            <Text style={[styles.cartItemName, { color: colors.text }]} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            <Text style={[styles.cartItemPrice, { color: colors.textLight }]}>
+                              Rs. {Number(item.price).toFixed(2)}
+                            </Text>
                           </View>
-                          <View style={styles.modalQtyRow}>
+
+                          <View style={[styles.modalQtyRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
                             <TouchableOpacity
                               style={styles.modalQtyBtn}
                               onPress={() => removeFromCart(id)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Decrease quantity for ${item.name}`}
                             >
-                              <Ionicons name="remove" size={12} color={COLORS.textMid} />
+                              <Ionicons name="remove" size={14} color={colors.textMid} />
                             </TouchableOpacity>
-                            <Text style={styles.modalQtyText}>{quantity}</Text>
+                            <Text style={[styles.modalQtyText, { color: colors.text }]}>{quantity}</Text>
                             <TouchableOpacity
-                              style={[styles.modalQtyBtn, { backgroundColor: COLORS.primary }]}
+                              style={styles.modalQtyBtn}
                               onPress={() => addItem(item)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Increase quantity for ${item.name}`}
                             >
-                              <Ionicons name="add" size={12} color={COLORS.white} />
+                              <Ionicons name="add" size={14} color={colors.primary} />
                             </TouchableOpacity>
                           </View>
+
                           <TouchableOpacity
                             style={styles.deleteBtn}
                             onPress={() => removeItem(id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove ${item.name} from bag`}
                           >
-                            <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
+                            <Ionicons name="trash-outline" size={19} color={colors.danger} />
                           </TouchableOpacity>
-                          <Text style={styles.cartItemTotal}>Rs. {(item.price * quantity).toFixed(2)}</Text>
+
+                          <Text style={[styles.cartItemTotal, { color: colors.primary }]}>
+                            Rs. {(item.price * quantity).toFixed(2)}
+                          </Text>
                         </View>
                       ))}
-                      <View style={styles.checkoutTotal}>
-                        <Text style={styles.cartTotalLabel}>Total</Text>
-                        <Text style={styles.cartTotalAmt}>Rs. {cartTotal.toFixed(2)}</Text>
+
+                      <View style={[styles.checkoutTotal, { borderTopColor: colors.divider }]}>
+                        <Text style={[styles.cartTotalLabel, { color: colors.text }]}>Total</Text>
+                        <Text style={[styles.cartTotalAmt, { color: colors.primary }]}>
+                          Rs. {cartTotal.toFixed(2)}
+                        </Text>
                       </View>
                     </>
                   )}
@@ -398,58 +910,106 @@ const HomeScreen = ({ navigation, route }) => {
 
                 {Object.entries(cart).length > 0 && (
                   <>
-                    <Text style={styles.stepLabel}>1. Order Type</Text>
+                    <Text style={[styles.stepLabel, { color: colors.text }]}>1. Dining Preference</Text>
                     <View style={styles.orderTypeRow}>
-                      {ORDER_TYPES.map(t => (
-                        <TouchableOpacity
-                          key={t.key}
-                          style={[styles.orderTypeBtn, orderType === t.key && styles.orderTypeBtnActive]}
-                          onPress={() => setOrderType(t.key)}
-                        >
-                          <Ionicons name={t.icon} size={24} color={orderType === t.key ? COLORS.primary : COLORS.textLight} />
-                          <Text style={[styles.orderTypeLabel, orderType === t.key && { color: COLORS.primary }]}>{t.label}</Text>
-                          <Text style={styles.orderTypeDesc}>{t.desc}</Text>
-                        </TouchableOpacity>
-                      ))}
+                      {ORDER_TYPES.map((t) => {
+                        const active = orderType === t.key;
+                        return (
+                          <TouchableOpacity
+                            key={t.key}
+                            style={[
+                              styles.orderTypeBtn,
+                              {
+                                backgroundColor: active ? colors.surface : colors.surfaceAlt,
+                                borderColor: active ? colors.primary : colors.divider,
+                              },
+                            ]}
+                            onPress={() => setOrderType(t.key)}
+                            accessibilityRole="button"
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons
+                              name={t.icon}
+                              size={22}
+                              color={active ? colors.primary : colors.textLight}
+                            />
+                            <Text
+                              style={[
+                                styles.orderTypeLabel,
+                                { color: active ? colors.primary : colors.text },
+                              ]}
+                            >
+                              {t.label}
+                            </Text>
+                            <Text style={[styles.orderTypeDesc, { color: colors.textLight }]}>{t.desc}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
 
                     {orderType === 'Dine-In' && (
                       <>
-                        <Text style={styles.stepLabel}>2. Select Table & Time</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+                        <Text style={[styles.stepLabel, { color: colors.text }]}>2. Select Table & Arrival Time</Text>
+                        <Text style={[styles.subStepLabel, { color: colors.textLight }]}>Choose a table (1–20):</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                           <View style={styles.tableGrid}>
-                            {TABLES.map(n => (
+                            {TABLES.map((n) => (
                               <TouchableOpacity
                                 key={n}
-                                style={[styles.tableBtn, tableNumber === n && styles.tableBtnActive]}
+                                style={[
+                                  styles.tableBtn,
+                                  {
+                                    backgroundColor: tableNumber === n ? colors.primary : colors.surfaceAlt,
+                                    borderColor: tableNumber === n ? colors.primary : colors.divider,
+                                  },
+                                ]}
                                 onPress={() => setTableNumber(n)}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Table number ${n}`}
                               >
-                                <Text style={[styles.tableBtnText, tableNumber === n && { color: COLORS.white }]}>{n}</Text>
+                                <Text
+                                  style={[
+                                    styles.tableBtnText,
+                                    { color: tableNumber === n ? colors.surface : colors.text },
+                                  ]}
+                                >
+                                  {n}
+                                </Text>
                               </TouchableOpacity>
                             ))}
                           </View>
                         </ScrollView>
 
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4, marginTop: 6 }}>
+                        <Text style={[styles.subStepLabel, { color: colors.textLight }]}>Select arrival slot:</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
                           <View style={styles.tableGrid}>
-                            {TIME_SLOTS.map(t => {
-                              const isBooked = tableNumber && bookedSlots.some(b => b.tableNumber === tableNumber && b.time === t);
+                            {TIME_SLOTS.map((t) => {
+                              const isBooked = tableNumber && bookedSlots.some((b) => b.tableNumber === tableNumber && b.time === t);
+                              const isSelected = reservationTime === t;
                               return (
                                 <TouchableOpacity
                                   key={t}
                                   style={[
                                     styles.timeBtn,
-                                    reservationTime === t && styles.tableBtnActive,
-                                    isBooked && styles.timeBtnBooked
+                                    {
+                                      backgroundColor: isSelected ? colors.primary : colors.surfaceAlt,
+                                      borderColor: isSelected ? colors.primary : colors.divider,
+                                    },
+                                    isBooked && { opacity: 0.4 },
                                   ]}
                                   onPress={() => !isBooked && setReservationTime(t)}
-                                  activeOpacity={isBooked ? 1 : 0.7}
+                                  activeOpacity={isBooked ? 1 : 0.8}
+                                  disabled={isBooked}
+                                  accessibilityRole="button"
                                 >
-                                  <Text style={[
-                                    styles.timeBtnText,
-                                    reservationTime === t && { color: COLORS.white },
-                                    isBooked && styles.timeBtnTextBooked
-                                  ]}>{t}</Text>
+                                  <Text
+                                    style={[
+                                      styles.timeBtnText,
+                                      { color: isSelected ? colors.surface : colors.text },
+                                    ]}
+                                  >
+                                    {t}
+                                  </Text>
                                 </TouchableOpacity>
                               );
                             })}
@@ -460,11 +1020,19 @@ const HomeScreen = ({ navigation, route }) => {
 
                     {orderType === 'Online Delivery' && (
                       <>
-                        <Text style={styles.stepLabel}>2. Delivery Address</Text>
+                        <Text style={[styles.stepLabel, { color: colors.text }]}>2. Delivery Address</Text>
                         <TextInput
-                          style={styles.addressInput}
-                          placeholder="Enter your full delivery address..."
-                          placeholderTextColor={COLORS.textLight}
+                          style={[
+                            styles.addressInput,
+                            {
+                              backgroundColor: colors.surfaceAlt,
+                              borderColor: colors.divider,
+                              color: colors.text,
+                              fontFamily: FONTS.sans,
+                            },
+                          ]}
+                          placeholder="Enter your delivery street address & apartment/suite..."
+                          placeholderTextColor={colors.textLight}
                           value={deliveryAddress}
                           onChangeText={setDeliveryAddress}
                           multiline
@@ -472,60 +1040,108 @@ const HomeScreen = ({ navigation, route }) => {
                       </>
                     )}
 
-                    <Text style={styles.stepLabel}>Payment Method</Text>
+                    <Text style={[styles.stepLabel, { color: colors.text }]}>3. Payment Method</Text>
                     <View style={styles.paymentOpts}>
-                      {PAYMENT_OPTIONS[orderType].map(opt => (
-                        <TouchableOpacity
-                          key={opt.key}
-                          style={[styles.payOpt, paymentMethod === opt.key && styles.payOptActive]}
-                          onPress={() => setPaymentMethod(opt.key)}
-                        >
-                          <Ionicons name={opt.icon} size={20} color={paymentMethod === opt.key ? COLORS.primary : COLORS.textLight} />
-                          <Text style={[styles.payOptLabel, paymentMethod === opt.key && { color: COLORS.primary }]}>{opt.label}</Text>
-                        </TouchableOpacity>
-                      ))}
+                      {PAYMENT_OPTIONS[orderType].map((opt) => {
+                        const active = paymentMethod === opt.key;
+                        return (
+                          <TouchableOpacity
+                            key={opt.key}
+                            style={[
+                              styles.payOpt,
+                              {
+                                backgroundColor: active ? colors.surface : colors.surfaceAlt,
+                                borderColor: active ? colors.primary : colors.divider,
+                              },
+                            ]}
+                            onPress={() => setPaymentMethod(opt.key)}
+                            accessibilityRole="button"
+                          >
+                            <Ionicons
+                              name={opt.icon}
+                              size={20}
+                              color={active ? colors.primary : colors.textLight}
+                            />
+                            <Text
+                              style={[
+                                styles.payOptLabel,
+                                { color: active ? colors.primary : colors.textMid },
+                              ]}
+                            >
+                              {opt.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
 
-                    {/* Saved Card Selector — shown when Card is chosen */}
                     {paymentMethod === 'Card' && (
                       <View style={styles.cardPickerSection}>
-                        <Text style={styles.cardPickerLabel}>Select Card</Text>
+                        <Text style={[styles.cardPickerLabel, { color: colors.textLight }]}>Saved Payment Cards</Text>
                         {loadingCards ? (
-                          <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 12 }} />
+                          <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
                         ) : savedCards.length === 0 ? (
-                          <TouchableOpacity style={styles.noCardBox} onPress={() => { setShowCheckout(false); navigation.navigate('SavedCards'); }}>
-                            <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
+                          <TouchableOpacity
+                            style={[styles.noCardBox, { backgroundColor: colors.surfaceAlt, borderColor: colors.divider }]}
+                            onPress={() => {
+                              setShowCheckout(false);
+                              navigation.navigate('SavedCards');
+                            }}
+                          >
+                            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
                             <View style={{ flex: 1 }}>
-                              <Text style={styles.noCardTitle}>No saved cards</Text>
-                              <Text style={styles.noCardSub}>Tap to add a card in your Profile</Text>
+                              <Text style={[styles.noCardTitle, { color: colors.text }]}>No saved cards found</Text>
+                              <Text style={[styles.noCardSub, { color: colors.textLight }]}>Tap to add one in your Profile</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={18} color={COLORS.textLight} />
+                            <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
                           </TouchableOpacity>
                         ) : (
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-                            {savedCards.map(card => {
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                            {savedCards.map((card) => {
                               const isSelected = selectedCard?._id === card._id;
                               const expiry = `${String(card.expiryMonth).padStart(2, '0')}/${String(card.expiryYear).slice(-2)}`;
                               return (
                                 <TouchableOpacity
                                   key={card._id}
-                                  style={[styles.miniCard, isSelected && styles.miniCardActive]}
+                                  style={[
+                                    styles.miniCard,
+                                    {
+                                      backgroundColor: isSelected ? colors.primary : colors.surfaceAlt,
+                                      borderColor: isSelected ? colors.primary : colors.divider,
+                                    },
+                                  ]}
                                   onPress={() => setSelectedCard(card)}
                                   activeOpacity={0.8}
                                 >
                                   <View style={styles.miniCardTop}>
-                                    <Ionicons name="card" size={18} color={isSelected ? COLORS.white : COLORS.textMid} />
-                                    {card.isDefault && <View style={styles.miniDefaultDot} />}
+                                    <Ionicons
+                                      name="card"
+                                      size={18}
+                                      color={isSelected ? colors.surface : colors.textMid}
+                                    />
+                                    {card.isDefault && (
+                                      <View style={[styles.miniDefaultDot, { backgroundColor: colors.accent }]} />
+                                    )}
                                   </View>
-                                  <Text style={[styles.miniCardNum, isSelected && { color: '#fff' }]}>
+                                  <Text
+                                    style={[
+                                      styles.miniCardNum,
+                                      { color: isSelected ? colors.surface : colors.text },
+                                    ]}
+                                  >
                                     •••• {card.last4}
                                   </Text>
-                                  <Text style={[styles.miniCardBrand, isSelected && { color: 'rgba(255,255,255,0.8)' }]}>
+                                  <Text
+                                    style={[
+                                      styles.miniCardBrand,
+                                      { color: isSelected ? colors.surfaceAlt : colors.textLight },
+                                    ]}
+                                  >
                                     {card.brand} · {expiry}
                                   </Text>
                                   {isSelected && (
                                     <View style={styles.miniSelected}>
-                                      <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                                      <Ionicons name="checkmark-circle" size={16} color={colors.surface} />
                                     </View>
                                   )}
                                 </TouchableOpacity>
@@ -537,15 +1153,26 @@ const HomeScreen = ({ navigation, route }) => {
                     )}
 
                     <TouchableOpacity
-                      style={[styles.placeBtn, placing && { opacity: 0.7 }]}
-                      onPress={() => handlePlaceOrder()}
+                      style={[
+                        styles.placeBtn,
+                        { backgroundColor: colors.primary },
+                        SHADOWS.card.web,
+                        placing && { opacity: 0.7 },
+                      ]}
+                      onPress={handlePlaceOrder}
                       disabled={placing}
+                      accessibilityRole="button"
                     >
-                      {placing ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.placeBtnText}>Confirm Order</Text>}
+                      {placing ? (
+                        <ActivityIndicator color={colors.surface} />
+                      ) : (
+                        <Text style={[styles.placeBtnText, { color: colors.surface }]}>
+                          Confirm Order · Rs. {cartTotal.toFixed(2)}
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   </>
                 )}
-                <View style={{ height: 40 }} />
               </ScrollView>
             )}
           </View>
@@ -556,205 +1183,733 @@ const HomeScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  topBar: { backgroundColor: COLORS.background, paddingTop: Platform.OS === 'android' ? 32 : 12, borderBottomWidth: 1, borderBottomColor: COLORS.divider },
-  topBarInner: { width: '100%', maxWidth: 1120, paddingHorizontal: 24, paddingVertical: 14, alignSelf: 'center', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  brandMark: { width: 37, height: 37, borderRadius: 12, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
-  brandText: { fontSize: 25, fontWeight: '800', color: COLORS.text, letterSpacing: -1 },
-  brandAccent: { fontWeight: '400' }, brandDot: { color: COLORS.accent },
-  profileButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E9E2D7', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.surface },
-  profileInitial: { fontSize: 16, fontWeight: '700', color: COLORS.primary },
-  scroll: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 120 },
-  greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 18 },
-  greeting: { color: COLORS.textMid, fontSize: 13, fontWeight: '500' },
-  hero: { backgroundColor: '#EAE4D9', borderRadius: 26, padding: 25, marginBottom: 20, overflow: 'hidden' },
-  heroWide: { flexDirection: 'row', padding: 38 },
+  container: { flex: 1 },
+  topBar: {
+    paddingTop: Platform.OS === 'android' ? 36 : 14,
+    borderBottomWidth: 1,
+  },
+  topBarInner: {
+    width: '100%',
+    maxWidth: 1120,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandMark: {
+    width: 38,
+    height: 38,
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  brandText: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+  },
+  brandSub: {
+    fontSize: 10,
+    letterSpacing: 0.4,
+    marginTop: -2,
+    fontFamily: FONTS.sans,
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  themePill: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileButton: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    borderRadius: RADIUS.full,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileInitial: { fontSize: 16, fontWeight: '700' },
+  scroll: {
+    width: '100%',
+    maxWidth: 1120,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 130,
+  },
+  greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 14,
+  },
+  greeting: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  // HERO STYLES
+  hero: {
+    borderRadius: RADIUS.xxl,
+    padding: 22,
+    marginBottom: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  heroWide: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 34,
+  },
   heroCopy: { flex: 1, zIndex: 1 },
-  eyebrow: { color: COLORS.accent, fontSize: 9, letterSpacing: 1.7, fontWeight: '800', marginBottom: 9 },
-  heroTitle: { color: COLORS.primary, fontSize: 36, lineHeight: 44, letterSpacing: -1.6, fontWeight: '800' },
-  heroDescription: { color: COLORS.textMid, fontSize: 13, lineHeight: 21, marginTop: 12, maxWidth: 360 },
-  heroButton: { backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', gap: 15, borderRadius: 13, paddingHorizontal: 18, paddingVertical: 13, marginTop: 22, alignSelf: 'flex-start' },
-  heroButtonText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
-  heroArt: { width: 250, alignItems: 'center', justifyContent: 'center', minHeight: 230 },
-  heroOrbit: { width: 228, height: 228, borderRadius: 114, position: 'absolute', backgroundColor: '#E1D6C4', borderWidth: 1, borderColor: '#D8CBB8' },
-  heroCup: { width: 172, height: 172, borderRadius: 86, backgroundColor: '#F9F5ED', justifyContent: 'center', alignItems: 'center', transform: [{ rotate: '-12deg' }], borderWidth: 8, borderColor: '#F1EBE0' },
-  heroArtLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.surface, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, marginTop: -8 },
-  heroArtText: { color: COLORS.textMid, fontSize: 10, fontWeight: '600' },
-  assistantCard: { backgroundColor: '#E6EDE5', borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: 32, borderWidth: 1, borderColor: '#D7E1D5' },
-  assistantIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
+  taglineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  eyebrow: {
+    fontSize: 10,
+    letterSpacing: 1.8,
+    fontWeight: '700',
+    fontFamily: FONTS.sans,
+  },
+  heroTitle: {
+    fontSize: 32,
+    lineHeight: 38,
+    letterSpacing: -1.2,
+    fontWeight: '700',
+  },
+  heroDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 10,
+    maxWidth: 380,
+    fontFamily: FONTS.sans,
+  },
+  heroActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 20,
+    flexWrap: 'wrap',
+  },
+  heroPrimaryBtn: {
+    minHeight: TOUCH_TARGET.buttonHeight,
+    paddingHorizontal: 20,
+    borderRadius: RADIUS.base,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroPrimaryBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: FONTS.sans,
+  },
+  heroSecondaryBtn: {
+    minHeight: TOUCH_TARGET.buttonHeight,
+    paddingHorizontal: 18,
+    borderRadius: RADIUS.base,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroSecondaryBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: FONTS.sans,
+  },
+  heroArt: {
+    width: 210,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 200,
+  },
+  heroOrbit: {
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    position: 'absolute',
+    borderWidth: 1,
+  },
+  heroCup: {
+    width: 146,
+    height: 146,
+    borderRadius: 73,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    transform: [{ rotate: '-8deg' }],
+  },
+  heroArtLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    marginTop: -8,
+  },
+  heroArtText: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: FONTS.sans,
+  },
+  // ASSISTANT CARD
+  assistantCard: {
+    borderRadius: RADIUS.xl,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 26,
+    borderWidth: 1,
+  },
+  assistantIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   assistantCopy: { flex: 1 },
-  assistantEyebrow: { color: COLORS.primary, fontSize: 8, letterSpacing: 1.2, fontWeight: '800', marginBottom: 5 },
-  assistantTitle: { color: COLORS.text, fontSize: 15, lineHeight: 21, fontWeight: '700' },
-  assistantDescription: { color: COLORS.textMid, fontSize: 11, lineHeight: 17, marginTop: 4 },
-  assistantArrow: { alignItems: 'center', justifyContent: 'center', width: 28 },
-  menuHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 17 },
-  sectionTitle: { fontSize: 22, color: COLORS.text, fontWeight: '700', letterSpacing: -0.6 },
-  menuCount: { fontSize: 11, color: COLORS.textLight },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: COLORS.divider, backgroundColor: COLORS.surface, borderRadius: 14, paddingHorizontal: 15, marginBottom: 16, minHeight: 49 },
-  searchInput: { flex: 1, color: COLORS.text, fontSize: 13, paddingVertical: 13, minWidth: 0 },
-  categories: { gap: 9, paddingBottom: 23 },
-  categoryChip: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, paddingHorizontal: 15, paddingVertical: 11, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.divider },
-  categoryChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  categoryText: { color: COLORS.textMid, fontSize: 12, fontWeight: '600' },
-  categoryTextActive: { color: COLORS.white },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.surface, padding: 14, borderRadius: 12, marginBottom: 18, borderWidth: 1, borderColor: COLORS.divider },
-  errorText: { flex: 1, fontSize: 12, lineHeight: 18, color: COLORS.textMid },
-  retryText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
-  emptyState: { paddingVertical: 50, alignItems: 'center', gap: 13, backgroundColor: COLORS.surface, borderRadius: 20, borderWidth: 1, borderColor: COLORS.divider, marginBottom: 16, paddingHorizontal: 20 },
-  emptyIcon: { width: 60, height: 60, borderRadius: 20, backgroundColor: '#E6EDE5', alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-  emptyDescription: { fontSize: 12, lineHeight: 20, color: COLORS.textLight, textAlign: 'center' },
-  resetButton: { padding: 10 },
+  assistantEyebrow: {
+    fontSize: 9,
+    letterSpacing: 1.2,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  assistantTitle: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
+    fontFamily: FONTS.sans,
+  },
+  assistantDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+    fontFamily: FONTS.sans,
+  },
+  assistantArrow: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // MENU HEADING & SEARCH
+  menuHeading: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  sectionEyebrow: {
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+  },
+  menuCount: {
+    fontSize: 12,
+    fontFamily: FONTS.sans,
+    marginBottom: 4,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: RADIUS.base,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    minHeight: TOUCH_TARGET.inputHeight,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 12,
+    minWidth: 0,
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
+  },
+  searchClearBtn: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categories: {
+    gap: 8,
+    paddingBottom: 18,
+  },
+  categoryChip: {
+    minHeight: TOUCH_TARGET.min,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+  },
+  categoryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: FONTS.sans,
+  },
+  categoryTextActive: {
+    fontWeight: '700',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: RADIUS.md,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  errorText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  retryText: { fontSize: 13, fontWeight: '700' },
+  emptyState: {
+    paddingVertical: 46,
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: RADIUS.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700' },
+  emptyDescription: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 320 },
+  resetButton: {
+    minHeight: TOUCH_TARGET.min,
+    paddingHorizontal: 18,
+    borderRadius: RADIUS.base,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  // MENU GRID & CARD
   menuGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  menuCard: { borderRadius: 18, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.divider, overflow: 'hidden' },
-  menuImageWrap: { height: 138, width: '100%', backgroundColor: '#EEE9E0', overflow: 'hidden' },
+  menuCard: {
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  menuImageWrap: { height: 142, width: '100%', overflow: 'hidden' },
   menuImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  imageFallback: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  imageRing: { height: 76, width: 76, borderRadius: 38, backgroundColor: '#F7F4EF', alignItems: 'center', justifyContent: 'center' },
-  imageCaption: { fontSize: 9, textTransform: 'uppercase', letterSpacing: 1.7, color: '#817461', fontWeight: '700' },
-  soldOut: { position: 'absolute', top: 10, left: 10, backgroundColor: COLORS.surface, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 },
-  soldOutText: { color: COLORS.textLight, fontSize: 9, fontWeight: '700' },
-  menuCardBody: { padding: 13 },
-  itemCategory: { color: COLORS.accent, fontSize: 9, fontWeight: '700', marginBottom: 5 },
-  itemName: { color: COLORS.text, fontWeight: '700', fontSize: 14, lineHeight: 19, minHeight: 38 },
-  itemDescription: { color: COLORS.textLight, fontSize: 11, lineHeight: 17, marginTop: 5, minHeight: 34 },
-  itemFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginTop: 15 },
-  itemPrice: { color: COLORS.primary, fontSize: 12, fontWeight: '800', flexShrink: 1 },
-  addButton: { width: 34, height: 34, borderRadius: 11, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
-  addButtonDisabled: { backgroundColor: COLORS.background },
-  quantityControl: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, backgroundColor: '#E6EDE5' },
-  quantityButton: { width: 29, height: 34, alignItems: 'center', justifyContent: 'center' },
-  quantity: { fontSize: 11, fontWeight: '700', color: COLORS.primary, minWidth: 13, textAlign: 'center' },
-  activityHeading: { marginTop: 34, marginBottom: 16 },
+  imageFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  imageRing: {
+    height: 72,
+    width: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  imageCaption: {
+    fontSize: 10,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+  },
+  soldOut: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+  },
+  soldOutText: { fontSize: 10, fontWeight: '700' },
+  menuCardBody: { padding: 14 },
+  itemCategory: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    marginBottom: 4,
+    fontFamily: FONTS.sans,
+  },
+  itemName: {
+    fontWeight: '700',
+    fontSize: 15,
+    lineHeight: 20,
+    minHeight: 40,
+  },
+  itemDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+    minHeight: 36,
+    fontFamily: FONTS.sans,
+  },
+  itemFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 14,
+  },
+  itemPrice: {
+    fontSize: 14,
+    fontWeight: '800',
+    fontFamily: FONTS.sans,
+  },
+  addButton: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+  },
+  quantityButton: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantity: {
+    fontSize: 13,
+    fontWeight: '700',
+    minWidth: 16,
+    textAlign: 'center',
+    fontFamily: FONTS.sans,
+  },
+  // ACTIVITY ROW
+  activityHeading: { marginTop: 32, marginBottom: 14 },
   activityRow: { flexDirection: 'row', gap: 14 },
-  activityCard: { flex: 1, borderWidth: 1, borderColor: COLORS.divider, backgroundColor: COLORS.surface, padding: 18, borderRadius: 18 },
-  activityIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#E6EDE5', justifyContent: 'center', alignItems: 'center', marginBottom: 13 },
-  activityValue: { fontSize: 26, color: COLORS.text, fontWeight: '700' },
-  activityLabel: { fontSize: 11, color: COLORS.textMid, marginTop: 4 },
-  activityArrow: { position: 'absolute', top: 22, right: 18 },
-  activityNotice: { flexDirection: 'row', gap: 10, alignItems: 'center', padding: 18, backgroundColor: COLORS.surface, borderRadius: 14 },
-  activityNoticeText: { flex: 1, fontSize: 12, color: COLORS.textMid },
-  footerNote: { textAlign: 'center', color: COLORS.textLight, fontSize: 10, lineHeight: 17, marginTop: 30 },
-  cartDock: { position: 'absolute', bottom: 16, left: 0, right: 0, alignItems: 'center' },
-  floatingCart: { minHeight: 68, backgroundColor: COLORS.primary, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 12, ...Platform.select({ ios: { shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10 }, android: { elevation: 7 }, web: { boxShadow: '0 6px 18px rgba(38,77,60,0.2)' } }) },
+  activityCard: {
+    flex: 1,
+    borderWidth: 1,
+    padding: 16,
+    borderRadius: RADIUS.xl,
+    minHeight: 100,
+  },
+  activityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  activityValue: { fontSize: 24, fontWeight: '700', fontFamily: FONTS.serif },
+  activityLabel: { fontSize: 12, marginTop: 2, fontFamily: FONTS.sans },
+  activityArrow: { position: 'absolute', top: 18, right: 16 },
+  activityNotice: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+  },
+  activityNoticeText: { flex: 1, fontSize: 13 },
+  footerNote: {
+    textAlign: 'center',
+    fontSize: 11,
+    lineHeight: 18,
+    marginTop: 32,
+    letterSpacing: 0.5,
+  },
+  // FLOATING CART DOCK
+  cartDock: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  floatingCart: {
+    minHeight: 64,
+    borderRadius: RADIUS.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
   cartInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cartBadge: { width: 34, height: 34, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  cartBadgeText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
-  cartLabel: { fontSize: 11, color: '#DDE7DF', marginBottom: 3 },
-  floatingCartTotal: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
-  checkoutArrow: { height: 36, width: 36, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  // Checkout Styles
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  cartBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartBadgeText: { fontSize: 15, fontWeight: '800' },
+  cartLabel: { fontSize: 11, marginBottom: 2, fontFamily: FONTS.sans },
+  floatingCartTotal: { fontSize: 16, fontWeight: '800', fontFamily: FONTS.sans },
+  checkoutArrow: {
+    height: TOUCH_TARGET.min,
+    width: TOUCH_TARGET.min,
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // CHECKOUT MODAL STYLES
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
   sheet: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 32, borderTopRightRadius: 32,
-    maxHeight: '92%', padding: 20, paddingTop: 10
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    maxHeight: '92%',
+    padding: 20,
+    paddingTop: 10,
+    borderWidth: 1,
   },
   sheetHandle: {
-    width: 40, height: 4, backgroundColor: COLORS.divider,
-    borderRadius: 2, alignSelf: 'center', marginBottom: 15
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 14,
   },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  sheetTitle: { fontSize: 22, fontWeight: '900', color: COLORS.text },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' },
-
-  cartItems: { backgroundColor: COLORS.background, borderRadius: 20, padding: 16, marginBottom: 20 },
-  cartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  cartItemName: { fontSize: 14, color: COLORS.text, fontWeight: '700' },
-  cartItemPrice: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
-  modalQtyRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 8 },
-  modalQtyBtn: { width: 20, height: 20, borderRadius: 5, backgroundColor: COLORS.divider, justifyContent: 'center', alignItems: 'center' },
-  modalQtyText: { fontSize: 13, fontWeight: '800', color: COLORS.text, width: 16, textAlign: 'center' },
-  deleteBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5 },
-  cartItemTotal: { fontSize: 14, color: COLORS.primary, fontWeight: '800', width: 80, textAlign: 'right' },
-  checkoutTotal: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: COLORS.divider, paddingTop: 12, marginTop: 5 },
-  cartTotalLabel: { fontSize: 16, fontWeight: '800', color: COLORS.text },
-  cartTotalAmt: { fontSize: 18, fontWeight: '900', color: COLORS.primary },
-
-  stepLabel: { fontSize: 16, fontWeight: '800', color: COLORS.text, marginBottom: 12, marginTop: 10 },
-  orderTypeRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  sheetTitle: { fontSize: 24, fontWeight: '800' },
+  sheetSub: { fontSize: 12, marginTop: 2, fontFamily: FONTS.sans },
+  closeBtn: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    borderRadius: RADIUS.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartItems: {
+    borderRadius: RADIUS.xl,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  cartRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  cartItemName: { fontSize: 14, fontWeight: '700', fontFamily: FONTS.sans },
+  cartItemPrice: { fontSize: 12, marginTop: 2 },
+  modalQtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 8,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+  },
+  modalQtyBtn: {
+    width: 32,
+    height: TOUCH_TARGET.min,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalQtyText: {
+    fontSize: 13,
+    fontWeight: '800',
+    width: 22,
+    textAlign: 'center',
+  },
+  deleteBtn: {
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  cartItemTotal: {
+    fontSize: 14,
+    fontWeight: '800',
+    width: 76,
+    textAlign: 'right',
+  },
+  checkoutTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    paddingTop: 14,
+    marginTop: 8,
+  },
+  cartTotalLabel: { fontSize: 16, fontWeight: '800' },
+  cartTotalAmt: { fontSize: 18, fontWeight: '800', fontFamily: FONTS.sans },
+  stepLabel: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 10,
+    marginTop: 14,
+    fontFamily: FONTS.sans,
+  },
+  subStepLabel: {
+    fontSize: 12,
+    marginBottom: 6,
+    fontFamily: FONTS.sans,
+  },
+  orderTypeRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
   orderTypeBtn: {
-    flex: 1, backgroundColor: COLORS.background, borderRadius: 18,
-    padding: 12, alignItems: 'center', borderWidth: 2, borderColor: 'transparent'
+    flex: 1,
+    borderRadius: RADIUS.base,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    minHeight: TOUCH_TARGET.min,
   },
-  orderTypeBtnActive: { borderColor: COLORS.primary, backgroundColor: COLORS.surface },
-  orderTypeLabel: { fontSize: 13, fontWeight: '800', color: COLORS.text, marginTop: 6 },
-  orderTypeDesc: { fontSize: 10, color: COLORS.textLight, textAlign: 'center', marginTop: 2 },
-
-  tableGrid: { flexDirection: 'row', gap: 8, paddingBottom: 10 },
+  orderTypeLabel: { fontSize: 13, fontWeight: '800', marginTop: 6 },
+  orderTypeDesc: { fontSize: 10, textAlign: 'center', marginTop: 2 },
+  tableGrid: { flexDirection: 'row', gap: 8, paddingBottom: 6 },
   tableBtn: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: COLORS.background,
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.divider
+    width: TOUCH_TARGET.min,
+    height: TOUCH_TARGET.min,
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
   },
-  tableBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  tableBtnText: { fontSize: 14, fontWeight: '800', color: COLORS.text },
-
+  tableBtnText: { fontSize: 14, fontWeight: '800' },
   timeBtn: {
-    paddingHorizontal: 16, height: 40, borderRadius: 12, backgroundColor: COLORS.background,
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.divider
+    paddingHorizontal: 16,
+    height: TOUCH_TARGET.min,
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
   },
-  timeBtnBooked: { backgroundColor: COLORS.divider, opacity: 0.5 },
-  timeBtnText: { fontSize: 13, fontWeight: '700', color: COLORS.text },
-  timeBtnTextBooked: { color: COLORS.textLight },
-
+  timeBtnText: { fontSize: 13, fontWeight: '700' },
   addressInput: {
-    backgroundColor: COLORS.background, borderRadius: 18, padding: 15,
-    height: 80, textAlignVertical: 'top', fontSize: 14, color: COLORS.text,
-    borderWidth: 1, borderColor: COLORS.divider, marginBottom: 20
+    borderRadius: RADIUS.base,
+    padding: 14,
+    height: 80,
+    textAlignVertical: 'top',
+    fontSize: 14,
+    borderWidth: 1,
+    marginBottom: 18,
   },
-
-  paymentOpts: { gap: 10, marginBottom: 25 },
+  paymentOpts: { gap: 10, marginBottom: 20 },
   payOpt: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: COLORS.background, padding: 16, borderRadius: 18,
-    borderWidth: 1, borderColor: COLORS.divider
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 15,
+    borderRadius: RADIUS.base,
+    borderWidth: 1,
+    minHeight: TOUCH_TARGET.buttonHeight,
   },
-  payOptActive: { borderColor: COLORS.primary, backgroundColor: COLORS.surface },
-  payOptLabel: { fontSize: 14, fontWeight: '700', color: COLORS.textMid },
-
+  payOptLabel: { fontSize: 14, fontWeight: '700' },
   placeBtn: {
-    backgroundColor: COLORS.primary, height: 60, borderRadius: 20,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6
+    minHeight: TOUCH_TARGET.largeButton,
+    borderRadius: RADIUS.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
   },
-  placeBtnText: { color: COLORS.white, fontSize: 18, fontWeight: '900' },
-
+  placeBtnText: { fontSize: 16, fontWeight: '800', fontFamily: FONTS.sans },
   successWrap: { padding: 20, alignItems: 'center' },
-  successTitle: { fontSize: 24, fontWeight: '900', color: COLORS.text, marginTop: 10 },
-  successSub: { fontSize: 15, color: COLORS.textLight, marginTop: 4, marginBottom: 25 },
-  successDetails: { width: '100%', backgroundColor: COLORS.background, borderRadius: 24, padding: 20, marginBottom: 30 },
-  successRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  successDetailLabel: { fontSize: 13, color: COLORS.textLight },
-  successDetailValue: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  successTotalRow: { borderTopWidth: 1, borderTopColor: COLORS.divider, paddingTop: 12, marginTop: 5 },
-  successTotalLabel: { fontSize: 15, fontWeight: '800', color: COLORS.text },
-  successTotalValue: { fontSize: 18, fontWeight: '900', color: COLORS.primary },
+  successTitle: { fontSize: 26, fontWeight: '800', marginTop: 8 },
+  successSub: { fontSize: 14, marginTop: 4, marginBottom: 20, textAlign: 'center' },
+  successDetails: {
+    width: '100%',
+    borderRadius: RADIUS.xl,
+    padding: 18,
+    marginBottom: 24,
+    borderWidth: 1,
+  },
+  successRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  successDetailLabel: { fontSize: 13 },
+  successDetailValue: { fontSize: 14, fontWeight: '700' },
+  successTotalRow: { borderTopWidth: 1, paddingTop: 10, marginTop: 4 },
+  successTotalLabel: { fontSize: 15, fontWeight: '800' },
+  successTotalValue: { fontSize: 18, fontWeight: '800' },
   successBtn: {
-    backgroundColor: COLORS.primary, width: '100%', height: 56, borderRadius: 18,
-    justifyContent: 'center', alignItems: 'center'
+    width: '100%',
+    minHeight: TOUCH_TARGET.buttonHeight,
+    borderRadius: RADIUS.base,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  successBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '800' },
-  // Saved Card Picker (Checkout)
+  successBtnText: { fontSize: 15, fontWeight: '700' },
   cardPickerSection: { marginBottom: 16 },
-  cardPickerLabel: { fontSize: 12, fontWeight: '800', color: COLORS.textLight, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  cardPickerLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   noCardBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: COLORS.surface, borderRadius: 16, padding: 16,
-    borderWidth: 1.5, borderColor: COLORS.divider,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: RADIUS.base,
+    padding: 14,
+    borderWidth: 1,
+    minHeight: TOUCH_TARGET.min,
   },
-  noCardTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  noCardSub: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
+  noCardTitle: { fontSize: 14, fontWeight: '700' },
+  noCardSub: { fontSize: 12, marginTop: 2 },
   miniCard: {
-    width: 130, borderRadius: 16, padding: 14, marginRight: 12,
-    backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.divider,
+    width: 136,
+    borderRadius: RADIUS.base,
+    padding: 14,
+    marginRight: 10,
+    borderWidth: 1.5,
   },
-  miniCardActive: { backgroundColor: COLORS.secondary, borderColor: COLORS.secondary },
-  miniCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  miniDefaultDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.primary },
-  miniCardNum: { fontSize: 14, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
-  miniCardBrand: { fontSize: 11, color: COLORS.textLight, fontWeight: '600' },
-  miniSelected: { position: 'absolute', top: 10, right: 10 },
+  miniCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  miniDefaultDot: { width: 8, height: 8, borderRadius: 4 },
+  miniCardNum: { fontSize: 13, fontWeight: '800', marginBottom: 3 },
+  miniCardBrand: { fontSize: 11, fontWeight: '600' },
+  miniSelected: { position: 'absolute', top: 8, right: 8 },
 });
 
 export default HomeScreen;

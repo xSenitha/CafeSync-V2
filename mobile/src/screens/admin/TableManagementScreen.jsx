@@ -11,11 +11,11 @@ import { Alert } from '../../utils/alert';
 
 const { width } = Dimensions.get('window');
 
-// Standardized User-Friendly Color Palette
+// Standardized User-Friendly Color Palette using Design Tokens
 const THEME = {
-  Available: { main: '#10B981', bg: '#ECFDF5', text: '#065F46', label: 'Available' }, // Emerald
-  Occupied: { main: '#F43F5E', bg: '#FFF1F2', text: '#9F1239', label: 'Occupied' },  // Rose
-  Reserved: { main: '#F59E0B', bg: '#FFFBEB', text: '#92400E', label: 'Reserved' },  // Amber
+  Available: { main: COLORS.success, bg: COLORS.successLight, text: COLORS.success, label: 'Available' },
+  Occupied: { main: COLORS.danger, bg: COLORS.dangerLight, text: COLORS.danger, label: 'Occupied' },
+  Reserved: { main: COLORS.warning, bg: COLORS.warningLight, text: COLORS.warning, label: 'Reserved' },
 };
 
 const buildTables = (orders, reservations) =>
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   panelEmpty: { fontSize: 14, color: COLORS.textMid, fontStyle: 'italic', textAlign: 'center', paddingVertical: 10 },
 
   filterList: { paddingHorizontal: 20, gap: 10 },
-  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: '#E5E7EB' },
+  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.divider },
   chipText: { fontSize: 13, fontWeight: '700', color: COLORS.textMid },
   list: { padding: 20, gap: 15, paddingBottom: 40 },
   resCard: {
@@ -401,11 +401,11 @@ const styles = StyleSheet.create({
   resCustomerName: { fontSize: 13, color: COLORS.textLight, marginTop: 2, fontWeight: '600' },
   resBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   resBadgeText: { fontSize: 11, fontWeight: '800' },
-  resTrashBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
+  resTrashBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.dangerLight, alignItems: 'center', justifyContent: 'center' },
   resMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 15, marginBottom: 12 },
   resMetaItemRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   resMetaItem: { fontSize: 12, color: COLORS.textMid, fontWeight: '600' },
-  resSpecialRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F9FAFB', padding: 10, borderRadius: 12, marginBottom: 15 },
+  resSpecialRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.surfaceAlt, padding: 10, borderRadius: 12, marginBottom: 15 },
   resSpecial: { fontSize: 12, color: COLORS.textMid, fontStyle: 'italic', flex: 1 },
   resBtnRow: { flexDirection: 'row', gap: 12 },
   resActionBtn: { height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
