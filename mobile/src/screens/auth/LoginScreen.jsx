@@ -143,7 +143,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 10,
-    marginTop: 8,
+    marginTop: 6,
   },
   buttonText: {
     fontSize: 15,
@@ -152,12 +152,12 @@ export const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    marginVertical: 24,
+    marginVertical: 16,
   },
   footer: {
     textAlign: 'center',
     fontSize: 13,
-    marginBottom: 12,
+    marginBottom: 10,
     fontFamily: FONTS.sans,
   },
   outline: {

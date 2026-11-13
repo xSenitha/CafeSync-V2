@@ -55,6 +55,21 @@ export const ThemeProvider = ({ children }) => {
           --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
+        html, body {
+          height: 100%;
+          min-height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
+          -webkit-overflow-scrolling: touch;
+        }
+        #root {
+          display: flex;
+          flex-direction: column;
+          min-height: 100%;
+          height: 100%;
+          width: 100%;
+        }
         html, body, input, button, textarea, select {
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }

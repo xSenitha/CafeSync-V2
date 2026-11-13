@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
   toastText: { fontWeight: '600', fontSize: 13, flex: 1 },
   scroll: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 130,
     maxWidth: 1120,
     width: '100%',
     alignSelf: 'center',

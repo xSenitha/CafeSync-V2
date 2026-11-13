@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   addBtn: { backgroundColor: 'rgba(255,255,255,0.22)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
   addBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 13 },
-  list: { padding: 16, gap: 10, paddingBottom: 40 },
+  list: { padding: 16, gap: 10, paddingBottom: 130 },
   itemCard: {
     backgroundColor: COLORS.surface, borderRadius: 18,
     padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12,

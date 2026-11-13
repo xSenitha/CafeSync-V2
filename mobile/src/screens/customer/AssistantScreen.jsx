@@ -3,7 +3,7 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { assistantAPI } from '../../api/assistant.api';
 import { useCart } from '../../context/CartContext';
@@ -80,6 +80,7 @@ function Recommendation({ item, quantity, onAdd, colors }) {
 export default function AssistantScreen({ navigation, route }) {
   const { cart, addToCart, cartCount } = useCart();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -413,7 +414,16 @@ export default function AssistantScreen({ navigation, route }) {
         </ScrollView>
 
         {/* Composer Bar */}
-        <View style={[styles.composerArea, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+        <View
+          style={[
+            styles.composerArea,
+            {
+              backgroundColor: colors.surface,
+              borderTopColor: colors.divider,
+              paddingBottom: Math.max(12, insets.bottom + 8),
+            },
+          ]}
+        >
           <View style={styles.contentColumn}>
             {!!cartNotice && (
               <View style={styles.cartNotice} accessibilityLiveRegion="polite">

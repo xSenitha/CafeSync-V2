@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   addBtnText: { fontSize: 14, fontWeight: '700', fontFamily: FONTS.sans },
   listContent: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 130,
     maxWidth: 1120,
     width: '100%',
     alignSelf: 'center',

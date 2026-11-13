@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   logoutText: { fontWeight: '700', fontSize: 13, fontFamily: FONTS.sans },
   scroll: {
     padding: 20,
-    paddingBottom: 80,
+    paddingBottom: 130,
     maxWidth: 1120,
     width: '100%',
     alignSelf: 'center',

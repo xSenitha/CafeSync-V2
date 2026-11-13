@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   roleText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   scroll: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 130,
     maxWidth: 1120,
     width: '100%',
     alignSelf: 'center',

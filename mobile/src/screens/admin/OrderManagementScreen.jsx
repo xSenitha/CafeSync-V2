@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   countTag: { backgroundColor: COLORS.textMid, paddingHorizontal: 6, borderRadius: 8 },
   countTagText: { fontSize: 10, fontWeight: '900', color: COLORS.white },
 
-  listContainer: { paddingBottom: 40 },
+  listContainer: { paddingBottom: 130 },
   card: {
     backgroundColor: COLORS.surface, borderRadius: 24, marginHorizontal: 20,
     marginBottom: 16, padding: 20,

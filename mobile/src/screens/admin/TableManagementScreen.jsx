@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   filterList: { paddingHorizontal: 20, gap: 10 },
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.divider },
   chipText: { fontSize: 13, fontWeight: '700', color: COLORS.textMid },
-  list: { padding: 20, gap: 15, paddingBottom: 40 },
+  list: { padding: 20, gap: 15, paddingBottom: 130 },
   resCard: {
     backgroundColor: COLORS.white, borderRadius: 22, padding: 18,
     ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.05, shadowRadius: 12 }, android: { elevation: 3 } }),

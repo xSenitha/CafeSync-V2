@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   scrollContent: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 130,
     maxWidth: 1120,
     width: '100%',
     alignSelf: 'center',

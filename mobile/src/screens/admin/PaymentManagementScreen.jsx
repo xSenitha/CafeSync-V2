@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   chipContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipText: { fontSize: 12, fontWeight: '700', color: COLORS.textMid },
 
-  listContent: { paddingBottom: 40 },
+  listContent: { paddingBottom: 130 },
   card: {
     backgroundColor: COLORS.surface, borderRadius: 20, marginHorizontal: 20,
     marginBottom: 12, padding: 16,
