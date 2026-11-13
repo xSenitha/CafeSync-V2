@@ -2,13 +2,11 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, Platform, RefreshControl,
-  ScrollView, Dimensions
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { adminPaymentsAPI } from '../../api';
 import { COLORS } from '../../constants/colors';
-
-const { width } = Dimensions.get('window');
 
 const STATUS_CONFIG = {
   Pending:   { color: COLORS.warning, icon: 'time-outline' },

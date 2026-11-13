@@ -38,7 +38,7 @@ export const ThemeProvider = ({ children }) => {
         const link = document.createElement('link');
         link.id = fontLinkId;
         link.rel = 'stylesheet';
-        link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
+        link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Inter:wght@300;400;500;600;700;800&display=swap';
         document.head.appendChild(link);
       }
 
@@ -53,6 +53,10 @@ export const ThemeProvider = ({ children }) => {
         :root {
           --safe-area-inset-top: env(safe-area-inset-top, 0px);
           --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        html, body, input, button, textarea, select {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
         * {
           -webkit-tap-highlight-color: transparent;

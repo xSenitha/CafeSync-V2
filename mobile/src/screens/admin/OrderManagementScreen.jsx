@@ -2,14 +2,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, Platform, RefreshControl,
-  ScrollView, Animated, Dimensions
+  ScrollView, Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { adminOrdersAPI } from '../../api';
 import { COLORS } from '../../constants/colors';
 import { Alert } from '../../utils/alert';
-
-const { width } = Dimensions.get('window');
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const STATUS_FLOW = { Pending: 'Preparing', Preparing: 'Ready', Ready: 'Completed' };
@@ -149,7 +147,7 @@ const OrderManagementScreen = () => {
     // Auto-refresh every 10 seconds for "Live" updates
     const timer = setInterval(fetchOrders, 10000);
     return () => clearInterval(timer);
-  }, []);
+  }, [fadeAnim]);
 
   const handleDelete = async (id) => {
     Alert.alert(

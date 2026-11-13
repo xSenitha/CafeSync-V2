@@ -11,6 +11,7 @@ import PaymentHistoryScreen from '../screens/customer/PaymentHistoryScreen';
 import ProfileScreen from '../screens/customer/ProfileScreen';
 import SavedCardsScreen from '../screens/customer/SavedCardsScreen';
 import AssistantScreen from '../screens/customer/AssistantScreen';
+import FloatingAssistiveAssistant from '../components/common/FloatingAssistiveAssistant';
 import { useTheme } from '../context/ThemeContext';
 import { FONTS } from '../constants/typography';
 import { RADIUS, TOUCH_TARGET } from '../constants/spacing';
@@ -91,6 +92,15 @@ function TabNavigator() {
   );
 }
 
+function CustomerTabsScreen({ navigation }) {
+  return (
+    <View style={styles.tabsContainer}>
+      <TabNavigator />
+      <FloatingAssistiveAssistant onPress={() => navigation.navigate('Assistant')} />
+    </View>
+  );
+}
+
 export default function CustomerNavigator() {
   const { colors } = useTheme();
 
@@ -102,7 +112,7 @@ export default function CustomerNavigator() {
         animation: 'fade',
       }}
     >
-      <Stack.Screen name="CustomerTabs" component={TabNavigator} />
+      <Stack.Screen name="CustomerTabs" component={CustomerTabsScreen} />
       <Stack.Screen name="Assistant" component={AssistantScreen} />
       <Stack.Screen name="SavedCards" component={SavedCardsScreen} />
     </Stack.Navigator>
@@ -110,6 +120,10 @@ export default function CustomerNavigator() {
 }
 
 const styles = StyleSheet.create({
+  tabsContainer: {
+    flex: 1,
+    position: 'relative',
+  },
   bar: {
     borderTopWidth: 1,
     paddingTop: 8,
