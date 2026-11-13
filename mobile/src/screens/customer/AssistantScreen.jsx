@@ -77,7 +77,7 @@ function Recommendation({ item, quantity, onAdd, colors }) {
   );
 }
 
-export default function AssistantScreen({ navigation }) {
+export default function AssistantScreen({ navigation, route }) {
   const { cart, addToCart, cartCount } = useCart();
   const { colors } = useTheme();
 
@@ -180,6 +180,18 @@ export default function AssistantScreen({ navigation }) {
     setDraft('');
     performRequest(request);
   };
+
+  const sendMessageRef = useRef();
+  sendMessageRef.current = sendMessage;
+
+  const initialHandledRef = useRef(false);
+  useEffect(() => {
+    const initialMsg = route?.params?.initialMessage;
+    if (initialMsg && !initialHandledRef.current) {
+      initialHandledRef.current = true;
+      sendMessageRef.current?.(initialMsg);
+    }
+  }, [route?.params?.initialMessage]);
 
   const clearChat = () => {
     sessionRef.current += 1;

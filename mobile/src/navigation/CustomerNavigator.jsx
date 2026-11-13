@@ -96,7 +96,11 @@ function CustomerTabsScreen({ navigation }) {
   return (
     <View style={styles.tabsContainer}>
       <TabNavigator />
-      <FloatingAssistiveAssistant onPress={() => navigation.navigate('Assistant')} />
+      <FloatingAssistiveAssistant
+        onPress={(initialMessage) =>
+          navigation.navigate('Assistant', initialMessage ? { initialMessage } : undefined)
+        }
+      />
     </View>
   );
 }
