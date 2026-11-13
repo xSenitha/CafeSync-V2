@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Animated,
+  Modal,
   PanResponder,
   StyleSheet,
   View,
@@ -177,12 +178,12 @@ export default function FloatingAssistiveAssistant({ onPress }) {
     const midpoint = (windowWidth - BUTTON_SIZE) / 2;
     const targetX = currX < midpoint ? SNAP_MARGIN : windowWidth - BUTTON_SIZE - SNAP_MARGIN;
 
-    const tabOffset = Platform.select({
+    const tabOff = Platform.select({
       web: 76,
       default: Math.max(72, insets.bottom + 60),
     });
     const minY = Math.max(SNAP_MARGIN, insets.top + 8);
-    const maxY = Math.max(minY, windowHeight - tabOffset - BUTTON_SIZE - 10);
+    const maxY = Math.max(minY, windowHeight - tabOff - BUTTON_SIZE - 10);
     const targetY = Math.min(Math.max(currY, minY), maxY);
 
     Animated.spring(pan, {
@@ -338,6 +339,187 @@ export default function FloatingAssistiveAssistant({ onPress }) {
     ? { bottom: Math.max(16, windowHeight - currentPosition.current.y + 12) }
     : { top: Math.max(16, currentPosition.current.y + BUTTON_SIZE + 12) };
 
+  // ─── On native mobile, we use a transparent Modal so the orb renders
+  // ─── above the entire navigation stack (escaping container clipping).
+  // ─── On web, we fall back to the classic absoluteFillObject overlay.
+  if (Platform.OS !== 'web') {
+    return (
+      <Modal
+        transparent
+        visible
+        animationType="none"
+        statusBarTranslucent
+        hardwareAccelerated
+      >
+        {/* Backdrop (only shown when popup is open) */}
+        {isOpen && (
+          <TouchableWithoutFeedback onPress={closePopup}>
+            <View style={styles.backdrop} />
+          </TouchableWithoutFeedback>
+        )}
+
+        {/* Pop-up Assistant Concierge Card */}
+        {isOpen && (
+          <Animated.View
+            style={[
+              styles.popupCard,
+              popupHorizontalStyle,
+              popupVerticalStyle,
+              {
+                backgroundColor: isDark ? '#201511' : '#FFFDF9',
+                borderColor: isDark ? 'rgba(217, 119, 74, 0.35)' : 'rgba(217, 119, 74, 0.25)',
+                transform: [{ scale: popupScale }],
+                opacity: popupOpacity,
+              },
+            ]}
+          >
+            {/* Header */}
+            <View style={styles.popupHeader}>
+              <View style={styles.headerTitleRow}>
+                <View style={[styles.headerIconBadge, { backgroundColor: colors.surfaceAlt }]}>
+                  <Ionicons name="sparkles" size={16} color={colors.accent} />
+                </View>
+                <View style={styles.headerTextCol}>
+                  <Text style={[styles.popupTitle, { color: colors.text, fontFamily: FONTS.serif }]}>
+                    CafeSync Assistant
+                  </Text>
+                  <Text style={[styles.popupSubtitle, { color: colors.textLight, fontFamily: FONTS.sans }]}>
+                    A little time for yourself
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={closePopup}
+                accessibilityRole="button"
+                accessibilityLabel="Close assistant menu"
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceAlt }]}
+              >
+                <Ionicons name="close" size={16} color={colors.textLight} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Prompts */}
+            <View style={styles.promptsSection}>
+              <Text style={[styles.promptsLabel, { color: colors.textLight, fontFamily: FONTS.sans }]}>
+                QUICK CONCIERGE PROMPTS
+              </Text>
+              {QUICK_PROMPTS.map((prompt, index) => (
+                <TouchableOpacity
+                  key={index}
+                  activeOpacity={0.7}
+                  onPress={() => handleNavigateToChat(prompt.message)}
+                  style={[
+                    styles.promptRow,
+                    {
+                      backgroundColor: isDark ? '#2B1C17' : '#F9F5F0',
+                      borderColor: isDark ? '#3D2821' : '#EFE5DA',
+                    },
+                  ]}
+                >
+                  <View style={[styles.promptIconWrap, { backgroundColor: isDark ? '#38251E' : '#F2E8DC' }]}>
+                    <Ionicons name={prompt.icon} size={15} color={colors.accent} />
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.promptText, { color: colors.text, fontFamily: FONTS.sans }]}
+                  >
+                    {prompt.label}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color={colors.textLight} />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Primary Action Button */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => handleNavigateToChat()}
+              style={[styles.fullChatBtn, { backgroundColor: colors.primary }]}
+            >
+              <Ionicons name="chatbubbles" size={16} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={[styles.fullChatText, { fontFamily: FONTS.sans }]}>
+                Open Full AI Chat
+              </Text>
+              <Ionicons name="arrow-forward" size={15} color="#FFF" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+
+            {/* Footer tip */}
+            <Text style={[styles.footerHint, { color: colors.textLight, fontFamily: FONTS.sans }]}>
+              ✦ Drag the floating orb anywhere to dock
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* Floating AssistiveTouch Orb */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <Animated.View
+            {...panResponder.panHandlers}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Cafe AI Assistant Assistive Touch"
+            accessibilityHint="Tap to open the AI assistant popup, or drag to reposition anywhere on screen"
+            style={[
+              styles.container,
+              {
+                transform: [
+                  { translateX: pan.x },
+                  { translateY: pan.y },
+                  { scale: Animated.multiply(scaleAnim, entranceAnim) },
+                ],
+                opacity: opacityAnim,
+              },
+            ]}
+          >
+            {/* Ambient Breathing Glow Aura */}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.auraRing,
+                {
+                  transform: [{ scale: auraAnim }],
+                  opacity: auraOpacity,
+                  borderColor: isDark ? 'rgba(217, 119, 74, 0.35)' : 'rgba(217, 119, 74, 0.25)',
+                },
+              ]}
+            />
+
+            {/* Main Circular Jewel Disc */}
+            <View
+              style={[
+                styles.outerDisc,
+                isDark ? styles.outerDiscDark : styles.outerDiscLight,
+              ]}
+            >
+              {/* Middle Concentric Ring */}
+              <View
+                style={[
+                  styles.middleRing,
+                  isDark ? styles.middleRingDark : styles.middleRingLight,
+                ]}
+              >
+                {/* Inner AI Badge */}
+                <Animated.View
+                  style={[
+                    styles.innerCore,
+                    { transform: [{ scale: pulseAnim }] },
+                  ]}
+                >
+                  <Ionicons name="sparkles" size={16} color="#FFF8EE" />
+                </Animated.View>
+              </View>
+
+              {/* Status Pearl */}
+              <View style={styles.statusPearl}>
+                <View style={styles.statusPearlInner} />
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // ─── Web: original absoluteFillObject approach (works fine in browsers)
   return (
     <>
       {/* Full-screen backdrop when popup is open for easy one-tap dismissal */}
