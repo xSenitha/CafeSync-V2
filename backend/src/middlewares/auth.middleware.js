@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
 const User = require('../domains/users/user.model');
+const { verifyToken } = require('../utils/jwt');
 
 // Protect routes
 const protect = async (req, res, next) => {
@@ -20,7 +20,7 @@ const protect = async (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = verifyToken(token);
 
     req.user = await User.findById(decoded.id);
     
@@ -30,6 +30,7 @@ const protect = async (req, res, next) => {
 
     next();
   } catch (err) {
+    if (err.name === 'AuthConfigurationError') return next(err);
     return res.status(401).json({ success: false, error: 'Not authorized to access this route' });
   }
 };

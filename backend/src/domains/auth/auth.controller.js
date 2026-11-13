@@ -2,7 +2,7 @@ const User = require('../users/user.model');
 const Order = require('../orders/order.model');
 const Payment = require('../payments/payment.model');
 const Reservation = require('../reservations/reservation.model');
-const { generateToken } = require('../../utils/jwt');
+const { assertAuthConfigured, generateToken } = require('../../utils/jwt');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -15,14 +15,15 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Please provide all required fields' });
     }
 
+    assertAuthConfigured();
+
     // Check if email already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ success: false, error: 'An account with this email already exists. Please sign in.' });
     }
 
-    // Create user
-    const user = await User.create({
+    const user = new User({
       name,
       email: email.toLowerCase(),
       password,
@@ -31,9 +32,14 @@ exports.register = async (req, res, next) => {
       mobile,
     });
 
+    // Allocate the ID and sign before writing the account. Invalid signing
+    // configuration must not leave behind an account after a failed response.
+    const token = generateToken(user._id);
+    await user.save();
+
     res.status(201).json({
       success: true,
-      token: generateToken(user._id),
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -59,6 +65,8 @@ exports.login = async (req, res, next) => {
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'Please provide an email and password' });
     }
+
+    assertAuthConfigured();
 
     // Check for user (case-insensitive email)
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');

@@ -3,19 +3,19 @@ const Card = require('./card.model');
 // @desc  Get all cards for logged-in user
 // @route GET /api/cards
 // @access Private
-exports.getCards = async (req, res) => {
+exports.getCards = async (req, res, next) => {
   try {
     const cards = await Card.find({ user: req.user.id }).sort({ isDefault: -1, createdAt: -1 });
     res.status(200).json({ success: true, data: cards });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    next(err);
   }
 };
 
 // @desc  Add a new card
 // @route POST /api/cards
 // @access Private
-exports.addCard = async (req, res) => {
+exports.addCard = async (req, res, next) => {
   try {
     const { last4, brand, cardholderName, expiryMonth, expiryYear, isDefault } = req.body;
 
@@ -59,14 +59,14 @@ exports.addCard = async (req, res) => {
 
     res.status(201).json({ success: true, data: card });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    next(err);
   }
 };
 
 // @desc  Update a card (set as default, update name/expiry)
 // @route PUT /api/cards/:id
 // @access Private
-exports.updateCard = async (req, res) => {
+exports.updateCard = async (req, res, next) => {
   try {
     let card = await Card.findOne({ _id: req.params.id, user: req.user.id });
 
@@ -90,14 +90,14 @@ exports.updateCard = async (req, res) => {
 
     res.status(200).json({ success: true, data: card });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    next(err);
   }
 };
 
 // @desc  Delete a card
 // @route DELETE /api/cards/:id
 // @access Private
-exports.deleteCard = async (req, res) => {
+exports.deleteCard = async (req, res, next) => {
   try {
     const card = await Card.findOne({ _id: req.params.id, user: req.user.id });
 
@@ -116,6 +116,6 @@ exports.deleteCard = async (req, res) => {
 
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    next(err);
   }
 };

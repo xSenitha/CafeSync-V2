@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../api/client';
 import { authAPI } from '../api';
+import { toUserApiError } from '../api/errors';
 
 export const AuthContext = createContext();
 
@@ -37,11 +38,7 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.setItem('token', token);
       setUser(userData);
     } catch (error) {
-      const backendError = error.response?.data?.error;
-      const msg = Array.isArray(backendError)
-        ? backendError[0]
-        : backendError || 'Login failed. Check your email and password.';
-      throw new Error(msg);
+      throw toUserApiError(error, 'Unable to sign in. Please try again.');
     }
   };
 
@@ -59,11 +56,7 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.setItem('token', token);
       setUser(userData);
     } catch (error) {
-      const backendError = error.response?.data?.error;
-      const msg = Array.isArray(backendError)
-        ? backendError[0]
-        : backendError || 'Registration failed. Please try again.';
-      throw new Error(msg);
+      throw toUserApiError(error, 'Unable to create your account. Please try again.');
     }
   };
 
@@ -78,18 +71,7 @@ export const AuthProvider = ({ children }) => {
       setUser(res.data.data);
       return res.data.data;
     } catch (error) {
-      const backendError = error.response?.data?.error;
-      let msg = 'Failed to update profile';
-      
-      if (typeof backendError === 'string') {
-        msg = backendError;
-      } else if (Array.isArray(backendError)) {
-        msg = backendError[0]; // Show the first validation error
-      } else if (backendError?.message) {
-        msg = backendError.message;
-      }
-      
-      throw new Error(msg);
+      throw toUserApiError(error, 'Unable to update your profile. Please try again.');
     }
   };
 
@@ -98,21 +80,7 @@ export const AuthProvider = ({ children }) => {
       await authAPI.deleteProfile();
       await logout();
     } catch (error) {
-      console.error('Delete Account Error:', error.response?.data || error.message);
-      const backendError = error.response?.data?.error || error.response?.data?.message;
-      let msg = 'Failed to delete account';
-      
-      if (typeof backendError === 'string') {
-        msg = backendError;
-      } else if (Array.isArray(backendError)) {
-        msg = backendError[0];
-      } else if (backendError?.message) {
-        msg = backendError.message;
-      } else if (error.message) {
-        msg = error.message;
-      }
-      
-      throw new Error(msg);
+      throw toUserApiError(error, 'Unable to delete your account. Please try again.');
     }
   };
 

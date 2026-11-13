@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { toUserApiError } from './errors';
 
 import { Platform } from 'react-native';
 
@@ -33,14 +34,19 @@ apiClient.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
-    } catch (e) {
-      console.error('Error fetching token', e);
+    } catch {
+      // A storage failure must not put raw internal errors in the app UI.
     }
     return config;
   },
   (error) => {
     return Promise.reject(error);
   }
+);
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => Promise.reject(toUserApiError(error)),
 );
 
 export default apiClient;

@@ -144,6 +144,10 @@ If the URI and Atlas IP access list are correct but requests still return 503, o
 
 These logs contain fixed diagnostic codes, not connection strings, credentials or raw driver errors. Local startup success does not verify the deployed environment or its network path.
 
+Authentication also requires a non-empty `JWT_SECRET` in the backend Vercel project's Production and Preview environments. Store it as a Secret with a long, randomly generated value, keep the same value across instances, and redeploy after saving it. `JWT_EXPIRE` is a non-secret duration such as `30d`; it defaults to `30d` when omitted. A missing signing secret logs `[CafeSync API] { code: 'auth_not_configured', status: 503 }`; invalid signing settings log `auth_invalid_configuration`. Customers receive a generic temporary-unavailability message. Registration signs the token before saving the account, so a signing failure does not create a partially registered account. Accounts created by earlier failed registration attempts can sign in after the secret is configured.
+
+Unexpected API errors use friendly public messages. The shared handler logs only fixed diagnostic categories and status codes, without raw errors or stacks. Input validation and credential errors remain actionable; internal library messages and database values are not sent to customers. The app also replaces unexpected server and network error details with safe messages.
+
 Commit `mobile/vercel.json`, the build script, `mobile/package-lock.json`, and the `.env.example` templates. Real `.env` files and generated `dist`/`node_modules` remain ignored. Both application folders are tracked as normal source directories in the main repository.
 
 ## AI assistant
